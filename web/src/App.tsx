@@ -46,6 +46,8 @@ function App() {
   const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [filterState, setFilterState] = useState<string>(localStorage.getItem('filter_state') || 'all');
+  const [pageSize, setPageSize] = useState<number>(parseInt(localStorage.getItem('page_size') || '50', 10));
 
   const fetchJulesStatus = async (issueId: number, token: string): Promise<{ status: string; url?: string } | undefined> => {
     try {
@@ -92,6 +94,16 @@ function App() {
     setShowSettings(false);
   };
 
+  const handleFilterStateChange = (newState: string) => {
+    setFilterState(newState);
+    localStorage.setItem('filter_state', newState);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    localStorage.setItem('page_size', size.toString());
+  };
+
   useEffect(() => {
     const fetchIssues = async () => {
       try {
@@ -107,9 +119,9 @@ function App() {
 
         let issuesData: GitHubIssue[] = [];
         if (ghToken) {
-          // Fetch up to 3 pages (300 items) from global issues endpoint
-          for (let page = 1; page <= 3; page++) {
-            const response = await fetch(`https://api.github.com/issues?state=all&filter=all&per_page=100&page=${page}`, { headers });
+          // Fetch up to 5 pages (500 items) from global issues endpoint
+          for (let page = 1; page <= 5; page++) {
+            const response = await fetch(`https://api.github.com/issues?state=${filterState}&filter=all&per_page=100&page=${page}`, { headers });
             if (!response.ok) {
               if (page === 1) throw new Error('Failed to fetch data from GitHub');
               break;
@@ -121,7 +133,7 @@ function App() {
           }
         } else {
           // Fallback to specific repo if no token
-          const response = await fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', { headers });
+          const response = await fetch(`https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=${filterState}`, { headers });
           if (!response.ok) throw new Error('Failed to fetch data from GitHub');
           const data: GitHubIssue[] = await response.json();
           // Manually add repository info if missing
@@ -240,7 +252,7 @@ function App() {
     };
 
     fetchIssues();
-  }, [ghToken, julesToken]);
+  }, [ghToken, julesToken, filterState]);
 
   return (
     <div className="dashboard">
@@ -292,6 +304,36 @@ function App() {
       )}
 
       <main>
+        {!loading && !error && (
+          <div className="filters-bar">
+            <div className="filter-group">
+              <label htmlFor="state-filter">State:</label>
+              <select
+                id="state-filter"
+                value={filterState}
+                onChange={(e) => handleFilterStateChange(e.target.value)}
+              >
+                <option value="all">All</option>
+                <option value="open">Only Open</option>
+              </select>
+            </div>
+            <div className="filter-group">
+              <label htmlFor="page-size">Show:</label>
+              <select
+                id="page-size"
+                value={pageSize}
+                onChange={(e) => handlePageSizeChange(parseInt(e.target.value, 10))}
+              >
+                <option value={10}>10</option>
+                <option value={20}>20</option>
+                <option value={50}>50</option>
+                <option value={100}>100</option>
+                <option value={250}>250</option>
+              </select>
+            </div>
+          </div>
+        )}
+
         {loading && <p className="status-message">Loading issues...</p>}
         {error && <p className="status-message error">Error: {error}</p>}
 
@@ -309,7 +351,7 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {issues.map(issue => (
+                {issues.slice(0, pageSize).map(issue => (
                   <tr key={issue.id}>
                     <td>{issue.number}</td>
                     <td>
