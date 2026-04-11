@@ -128,7 +128,7 @@ function App() {
           const updatedItem: IssueWithJulesStatus = { ...item };
 
           if (
-            (item.assignee?.login === 'Jules' || item.labels.some(l => l.name === 'Jules')) &&
+            (item.assignee?.login?.toLowerCase() === 'jules' || item.labels.some(l => l.name.toLowerCase() === 'jules')) &&
             julesToken
           ) {
             updatedItem.julesStatus = await fetchJulesStatus(item.number, julesToken);
