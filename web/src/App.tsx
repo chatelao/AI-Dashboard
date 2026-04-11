@@ -148,7 +148,6 @@ function App() {
                         {issue.state}
                       </span>
                     </td>
-                    <td>{issue.assignee?.login || 'Unassigned'}</td>
                     <td>
                       {issue.prStatus ? (
                         <div className="pr-status-container">
