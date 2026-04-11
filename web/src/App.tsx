@@ -247,7 +247,8 @@ function App() {
       <header>
         <div className="header-content">
           <div>
-            <h1>AI-Dashboard</h1>
+            <h1>AI Development Dashboard</h1>
+            <p>Unified view of GitHub Issues and Google Jules Statuses</p>
           </div>
           <button
             className="settings-toggle"
@@ -310,8 +311,8 @@ function App() {
               <tbody>
                 {issues.map(issue => (
                   <tr key={issue.id}>
-                    <td data-label="#">{issue.number}</td>
-                    <td data-label="Title" className="title-cell">
+                    <td>{issue.number}</td>
+                    <td>
                       <div className="title-container">
                         <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
                           [{issue.repository.full_name.split('/')[1]}] {issue.title}
@@ -325,12 +326,12 @@ function App() {
                         ))}
                       </div>
                     </td>
-                    <td data-label="State">
+                    <td>
                       <span className={`badge state-${issue.state}`}>
                         {issue.state}
                       </span>
                     </td>
-                    <td data-label="Assignee">
+                    <td>
                       {issue.assignee ? (
                         <span className="assignee-badge">
                           {issue.assignee.login}
@@ -339,7 +340,7 @@ function App() {
                         <span className="text-muted">-</span>
                       )}
                     </td>
-                    <td data-label="PR">
+                    <td>
                       <div className="pr-status-group">
                         {issue.prStatus && (
                           <div className="pr-status-container">
@@ -388,7 +389,7 @@ function App() {
                         )}
                       </div>
                     </td>
-                    <td data-label="Jules Status">
+                    <td>
                       <div className="jules-status-group">
                         {issue.julesStatus ? (
                           issue.julesUrl ? (
