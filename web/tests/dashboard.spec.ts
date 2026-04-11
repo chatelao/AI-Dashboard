@@ -168,21 +168,27 @@ test.describe('Dashboard Consolidation', () => {
       });
     });
 
-    // Mock Jules API for Issue 201
+    // Mock Jules API for Issue 201 (using 'url' field)
     await page.route('https://jules.googleapis.com/v1/tasks/201/status', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ status: 'Coding' })
+        body: JSON.stringify({
+          status: 'Coding',
+          url: 'https://jules.google.com/task/201'
+        })
       });
     });
 
-    // Mock Jules API for PR 202
+    // Mock Jules API for PR 202 (using 'task_url' field)
     await page.route('https://jules.googleapis.com/v1/tasks/202/status', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ status: 'Researching' })
+        body: JSON.stringify({
+          status: 'Researching',
+          task_url: 'https://jules.google.com/task/202'
+        })
       });
     });
 
@@ -190,11 +196,17 @@ test.describe('Dashboard Consolidation', () => {
 
     const issueRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /^201$/ }) });
 
-    // Verify Issue 201 status
-    await expect(issueRow.locator('td').nth(5)).toContainText('Coding');
+    // Verify Issue 201 status and link
+    const julesStatusCell = issueRow.locator('td').nth(5);
+    await expect(julesStatusCell).toContainText('Coding');
+    const issueLink = julesStatusCell.locator('a').first();
+    await expect(issueLink).toHaveAttribute('href', 'https://jules.google.com/task/201');
 
-    // Verify Linked PR 202 status (as subtitle in Jules Status column)
-    await expect(issueRow.locator('td').nth(5).locator('.subtitle')).toContainText('Researching');
+    // Verify Linked PR 202 status and link (as subtitle in Jules Status column)
+    const prSubtitle = julesStatusCell.locator('.subtitle');
+    await expect(prSubtitle).toContainText('Researching');
+    const prLink = prSubtitle.locator('a');
+    await expect(prLink).toHaveAttribute('href', 'https://jules.google.com/task/202');
   });
 
   test('should display Jules status for items with lowercase "jules" label', async ({ page }) => {
@@ -239,5 +251,49 @@ test.describe('Dashboard Consolidation', () => {
 
     // Verify Issue 301 status
     await expect(issueRow.locator('td').nth(5)).toContainText('Testing');
+  });
+
+  test('should display Jules status for items assigned to google-labs-jules[bot]', async ({ page }) => {
+    // Set mock jules_token
+    await page.addInitScript(() => {
+      window.localStorage.setItem('jules_token', 'mock-jules-token');
+    });
+
+    // Mock GitHub Issues API
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 401,
+            number: 401,
+            title: 'Jules bot issue',
+            state: 'open',
+            html_url: 'https://github.com/chatelao/AI-Dashboard/issues/401',
+            body: 'Help me jules bot',
+            assignee: { login: 'google-labs-jules[bot]' },
+            labels: [],
+            repository: { full_name: 'chatelao/AI-Dashboard' }
+          }
+        ])
+      });
+    });
+
+    // Mock Jules API for Issue 401
+    await page.route('https://jules.googleapis.com/v1/tasks/401/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'Completed' })
+      });
+    });
+
+    await page.goto('/');
+
+    const issueRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /^401$/ }) });
+
+    // Verify Issue 401 status
+    await expect(issueRow.locator('td').nth(5)).toContainText('Completed');
   });
 });

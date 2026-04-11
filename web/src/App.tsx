@@ -30,6 +30,7 @@ interface PRStatus {
 
 interface IssueWithJulesStatus extends GitHubIssue {
   julesStatus?: string;
+  julesUrl?: string;
   prStatus?: PRStatus;
   linkedPRs?: IssueWithJulesStatus[];
 }
@@ -46,7 +47,7 @@ function App() {
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
-  const fetchJulesStatus = async (issueId: number, token: string): Promise<string | undefined> => {
+  const fetchJulesStatus = async (issueId: number, token: string): Promise<{ status: string; url?: string } | undefined> => {
     try {
       const response = await fetch(`${JULES_API_BASE_URL}/tasks/${issueId}/status`, {
         headers: {
@@ -58,7 +59,13 @@ function App() {
       }
       const data: unknown = await response.json();
       if (data && typeof data === 'object' && 'status' in data && typeof data.status === 'string') {
-        return data.status;
+        const result: { status: string; url?: string } = { status: data.status };
+        if ('url' in data && typeof data.url === 'string') {
+          result.url = data.url;
+        } else if ('task_url' in data && typeof data.task_url === 'string') {
+          result.url = data.task_url;
+        }
+        return result;
       }
       return undefined;
     } catch (err) {
@@ -127,11 +134,18 @@ function App() {
         const processedItems = await Promise.all(issuesData.map(async (item) => {
           const updatedItem: IssueWithJulesStatus = { ...item };
 
-          if (
-            (item.assignee?.login?.toLowerCase() === 'jules' || item.labels.some(l => l.name.toLowerCase() === 'jules')) &&
-            julesToken
-          ) {
-            updatedItem.julesStatus = await fetchJulesStatus(item.number, julesToken);
+          const isJules = (
+            item.assignee?.login?.toLowerCase() === 'jules' ||
+            item.assignee?.login?.toLowerCase() === 'google-labs-jules[bot]' ||
+            item.labels.some(l => l.name.toLowerCase() === 'jules')
+          );
+
+          if (isJules && julesToken) {
+            const result = await fetchJulesStatus(item.number, julesToken);
+            if (result) {
+              updatedItem.julesStatus = result.status;
+              updatedItem.julesUrl = result.url;
+            }
           }
 
           if (item.pull_request) {
@@ -378,9 +392,17 @@ function App() {
                     <td>
                       <div className="jules-status-group">
                         {issue.julesStatus ? (
-                          <span className={`badge jules-status-${issue.julesStatus.toLowerCase()}`}>
-                            {issue.julesStatus}
-                          </span>
+                          issue.julesUrl ? (
+                            <a href={issue.julesUrl} target="_blank" rel="noopener noreferrer">
+                              <span className={`badge jules-status-${issue.julesStatus.toLowerCase()}`}>
+                                {issue.julesStatus}
+                              </span>
+                            </a>
+                          ) : (
+                            <span className={`badge jules-status-${issue.julesStatus.toLowerCase()}`}>
+                              {issue.julesStatus}
+                            </span>
+                          )
                         ) : (
                           (!issue.linkedPRs || issue.linkedPRs.every(pr => !pr.julesStatus)) && (
                             <span className="text-muted">-</span>
@@ -389,9 +411,17 @@ function App() {
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
                           pr.julesStatus && (
                             <div key={pr.id} className="subtitle">
-                              <span className={`badge jules-status-${pr.julesStatus.toLowerCase()}`}>
-                                {pr.julesStatus}
-                              </span>
+                              {pr.julesUrl ? (
+                                <a href={pr.julesUrl} target="_blank" rel="noopener noreferrer">
+                                  <span className={`badge jules-status-${pr.julesStatus.toLowerCase()}`}>
+                                    {pr.julesStatus}
+                                  </span>
+                                </a>
+                              ) : (
+                                <span className={`badge jules-status-${pr.julesStatus.toLowerCase()}`}>
+                                  {pr.julesStatus}
+                                </span>
+                              )}
                             </div>
                           )
                         ))}
