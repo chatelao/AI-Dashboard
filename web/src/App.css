@@ -226,6 +226,33 @@ a:hover {
 .pr-label-red { color: #f85149; }
 .pr-label-yellow { color: #d29922; }
 
+.title-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.subtitle {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+.subtitle a {
+  color: #8b949e;
+}
+
+.subtitle a:hover {
+  color: #58a6ff;
+}
+
+.pr-status-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
 @media (max-width: 768px) {
   #root {
     padding: 1rem;
