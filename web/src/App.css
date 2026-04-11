@@ -10,14 +10,36 @@
 }
 
 header {
-  margin-bottom: 1rem;
+  margin-bottom: 0.5rem;
 }
 
 .header-content {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   text-align: left;
+  gap: 1rem;
+}
+
+h1 {
+  font-size: 32px;
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.repo-selector input {
+  padding: 6px 12px;
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-family: inherit;
+  width: 200px;
 }
 
 .settings-toggle {
@@ -120,6 +142,48 @@ header {
 }
 
 .btn-cancel:hover {
+  background-color: #30363d;
+}
+
+.filters-bar {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  padding: 0.5rem 1rem;
+  background-color: #1a1a1a;
+  border-radius: 6px;
+  border: 1px solid #333;
+  flex-wrap: wrap;
+}
+
+.filter-group {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.filter-group select {
+  padding: 4px 8px;
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 4px;
+  color: #c9d1d9;
+}
+
+.btn-refresh {
+  padding: 4px 12px;
+  background-color: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+.btn-refresh:hover {
   background-color: #30363d;
 }
 
@@ -265,8 +329,45 @@ a:hover {
   }
 
   h1 {
-    font-size: 1.5rem;
+    font-size: 1.25rem;
+    line-height: 1.25rem;
     margin: 0.5rem 0;
+  }
+
+  .header-content {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+  }
+
+  .header-actions {
+    width: 100%;
+    justify-content: space-between;
+  }
+
+  .repo-selector {
+    flex-grow: 1;
+  }
+
+  .repo-selector input {
+    width: 100%;
+  }
+
+  .filters-bar {
+    gap: 0.5rem;
+    padding: 0.5rem;
+  }
+
+  .filter-group {
+    flex-grow: 1;
+  }
+
+  .filter-group select {
+    width: 100%;
+  }
+
+  .btn-refresh {
+    width: 100%;
   }
 
   header p {

@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Dashboard Consolidation', () => {
   test('should consolidate PRs into issues as subtitles', async ({ page }) => {
     // Mock GitHub Issues API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -48,7 +48,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Pull Detail API for PR 102
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls/102', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/pulls/102', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -57,7 +57,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Pull Detail API for PR 103
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls/103', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/pulls/103', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -66,7 +66,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock Check Runs API for PR 102
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/commits/sha102/check-runs', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/commits/sha102/check-runs', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -78,7 +78,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock Check Runs API for PR 103
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/commits/sha103/check-runs', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/commits/sha103/check-runs', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -115,7 +115,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Issues API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -148,7 +148,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Pull Detail API for PR 202
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls/202', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/pulls/202', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -157,7 +157,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock Check Runs API for PR 202
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/commits/sha202/check-runs', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/commits/sha202/check-runs', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -169,7 +169,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock Jules API for Issue 201 (using 'url' field)
-    await page.route('https://jules.googleapis.com/v1/tasks/201/status', async (route) => {
+    await page.route('**/v1/tasks/201/status', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -181,7 +181,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock Jules API for PR 202 (using 'task_url' field)
-    await page.route('https://jules.googleapis.com/v1/tasks/202/status', async (route) => {
+    await page.route('**/v1/tasks/202/status', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -216,7 +216,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Issues API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -237,7 +237,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock Jules API for Issue 301
-    await page.route('https://jules.googleapis.com/v1/tasks/301/status', async (route) => {
+    await page.route('**/v1/tasks/301/status', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -260,7 +260,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Issues API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -281,7 +281,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock Jules API for Issue 401
-    await page.route('https://jules.googleapis.com/v1/tasks/401/status', async (route) => {
+    await page.route('**/v1/tasks/401/status', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

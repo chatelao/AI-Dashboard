@@ -46,6 +46,18 @@ function App() {
   const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [currentRepo, setCurrentRepo] = useState<string>(localStorage.getItem('current_gh_repo') || 'chatelao/AI-Dashboard');
+  const [repoHistory, setRepoHistory] = useState<string[]>(() => {
+    const saved = localStorage.getItem('gh_repos');
+    return saved ? JSON.parse(saved) : ['chatelao/AI-Dashboard'];
+  });
+  const [filterState, setFilterState] = useState<'all' | 'open'>(
+    (localStorage.getItem('filter_state') as 'all' | 'open') || 'all'
+  );
+  const [pageSize, setPageSize] = useState<number>(
+    parseInt(localStorage.getItem('page_size') || '50', 10)
+  );
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   const fetchJulesStatus = async (issueId: number, token: string): Promise<{ status: string; url?: string } | undefined> => {
     try {
@@ -80,6 +92,7 @@ function App() {
     setGhToken(draftGhToken);
     setJulesToken(draftJulesToken);
     setShowSettings(false);
+    setRefreshTrigger(prev => prev + 1);
   };
 
   const handleClearSettings = () => {
@@ -90,45 +103,43 @@ function App() {
     setDraftGhToken('');
     setDraftJulesToken('');
     setShowSettings(false);
+    setRefreshTrigger(prev => prev + 1);
   };
 
   useEffect(() => {
     const fetchIssues = async () => {
+      setLoading(true);
+      setError(null);
       try {
         const headers: HeadersInit = {};
         if (ghToken) {
           headers['Authorization'] = `token ${ghToken}`;
         }
 
-        if (julesToken) {
-          console.log(`Using Jules API at ${JULES_API_BASE_URL}`);
-          // Future integration: headers['X-Jules-Token'] = julesToken;
-        }
-
         let issuesData: GitHubIssue[] = [];
-        if (ghToken) {
-          // Fetch up to 3 pages (300 items) from global issues endpoint
-          for (let page = 1; page <= 3; page++) {
-            const response = await fetch(`https://api.github.com/issues?state=all&filter=all&per_page=100&page=${page}`, { headers });
-            if (!response.ok) {
-              if (page === 1) throw new Error('Failed to fetch data from GitHub');
-              break;
-            }
-            const data: GitHubIssue[] = await response.json();
-            if (data.length === 0) break;
-            issuesData = [...issuesData, ...data];
-            if (data.length < 100) break;
+        // Sequential fetch up to 5 pages
+        for (let page = 1; page <= 5; page++) {
+          const response = await fetch(
+            `https://api.github.com/repos/${currentRepo}/issues?state=${filterState}&per_page=100&page=${page}`,
+            { headers }
+          );
+          if (!response.ok) {
+            if (page === 1) throw new Error(`Failed to fetch from ${currentRepo}`);
+            break;
           }
-        } else {
-          // Fallback to specific repo if no token
-          const response = await fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', { headers });
-          if (!response.ok) throw new Error('Failed to fetch data from GitHub');
-          const data: GitHubIssue[] = await response.json();
-          // Manually add repository info if missing
-          issuesData = data.map(item => ({
-            ...item,
-            repository: item.repository || { full_name: 'chatelao/AI-Dashboard' }
-          }));
+          const data: unknown = await response.json();
+          if (Array.isArray(data)) {
+            const pageIssues = data as GitHubIssue[];
+            if (pageIssues.length === 0) break;
+            // Manually add repository info if missing from API response (e.g. some repo endpoints)
+            issuesData = [...issuesData, ...pageIssues.map(item => ({
+              ...item,
+              repository: item.repository || { full_name: currentRepo }
+            }))];
+            if (pageIssues.length < 100) break;
+          } else {
+            break;
+          }
         }
 
         const processedItems = await Promise.all(issuesData.map(async (item) => {
@@ -153,36 +164,38 @@ function App() {
               // Fetch full PR details to get head.sha
               const prResponse = await fetch(item.pull_request.url, { headers });
               if (prResponse.ok) {
-                const prDetail = await prResponse.json();
-                const sha = prDetail.head.sha;
-                const checkRunsResponse = await fetch(
-                  `https://api.github.com/repos/${item.repository.full_name}/commits/${sha}/check-runs`,
-                  { headers }
-                );
-                if (checkRunsResponse.ok) {
-                  const checkRunsData = await checkRunsResponse.json();
-                  let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
+                const prDetail: unknown = await prResponse.json();
+                if (prDetail && typeof prDetail === 'object' && 'head' in prDetail && prDetail.head && typeof prDetail.head === 'object' && 'sha' in prDetail.head) {
+                  const sha = (prDetail.head as { sha: string }).sha;
+                  const checkRunsResponse = await fetch(
+                    `https://api.github.com/repos/${item.repository.full_name}/commits/${sha}/check-runs`,
+                    { headers }
+                  );
+                  if (checkRunsResponse.ok) {
+                    const checkRunsData: unknown = await checkRunsResponse.json();
+                    let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
 
-                  if (checkRunsData.total_count > 0) {
-                    const checkRuns = checkRunsData.check_runs;
-                    const someFailed = checkRuns.some((run: { conclusion: string }) =>
-                      ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
-                    );
-                    const someRunning = checkRuns.some((run: { status: string }) => run.status !== 'completed');
+                    if (checkRunsData && typeof checkRunsData === 'object' && 'total_count' in checkRunsData && typeof checkRunsData.total_count === 'number' && checkRunsData.total_count > 0 && 'check_runs' in checkRunsData && Array.isArray(checkRunsData.check_runs)) {
+                      const checkRuns = checkRunsData.check_runs as { status: string; conclusion: string }[];
+                      const someFailed = checkRuns.some(run =>
+                        ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
+                      );
+                      const someRunning = checkRuns.some(run => run.status !== 'completed');
 
-                    if (someFailed) {
-                      color = 'red';
-                    } else if (someRunning) {
-                      color = 'yellow';
-                    } else {
-                      color = 'green';
+                      if (someFailed) {
+                        color = 'red';
+                      } else if (someRunning) {
+                        color = 'yellow';
+                      } else {
+                        color = 'green';
+                      }
                     }
-                  }
 
-                  updatedItem.prStatus = {
-                    color,
-                    label: 'Create'
-                  };
+                    updatedItem.prStatus = {
+                      color,
+                      label: 'Create'
+                    };
+                  }
                 }
               }
             } catch (err) {
@@ -240,7 +253,28 @@ function App() {
     };
 
     fetchIssues();
-  }, [ghToken, julesToken]);
+  }, [ghToken, julesToken, currentRepo, filterState, refreshTrigger]);
+
+  const handleRepoChange = (newRepo: string) => {
+    if (!newRepo) return;
+    setCurrentRepo(newRepo);
+    localStorage.setItem('current_gh_repo', newRepo);
+    if (!repoHistory.includes(newRepo)) {
+      const newHistory = [newRepo, ...repoHistory].slice(0, 10);
+      setRepoHistory(newHistory);
+      localStorage.setItem('gh_repos', JSON.stringify(newHistory));
+    }
+  };
+
+  const handleFilterChange = (state: 'all' | 'open') => {
+    setFilterState(state);
+    localStorage.setItem('filter_state', state);
+  };
+
+  const handlePageSizeChange = (size: number) => {
+    setPageSize(size);
+    localStorage.setItem('page_size', size.toString());
+  };
 
   return (
     <div className="dashboard">
@@ -249,13 +283,29 @@ function App() {
           <div>
             <h1>AI Development Dashboard</h1>
           </div>
-          <button
-            className="settings-toggle"
-            onClick={() => setShowSettings(!showSettings)}
-            aria-label="Settings"
-          >
-            ⚙️
-          </button>
+          <div className="header-actions">
+            <div className="repo-selector">
+              <input
+                type="text"
+                list="repo-history"
+                value={currentRepo}
+                onChange={(e) => setCurrentRepo(e.target.value)}
+                onBlur={(e) => handleRepoChange(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleRepoChange((e.target as HTMLInputElement).value)}
+                placeholder="owner/repo"
+              />
+              <datalist id="repo-history">
+                {repoHistory.map(repo => <option key={repo} value={repo} />)}
+              </datalist>
+            </div>
+            <button
+              className="settings-toggle"
+              onClick={() => setShowSettings(!showSettings)}
+              aria-label="Settings"
+            >
+              ⚙️
+            </button>
+          </div>
         </div>
       </header>
 
@@ -291,6 +341,29 @@ function App() {
       )}
 
       <main>
+        <div className="filters-bar">
+          <div className="filter-group">
+            <label>Filter:</label>
+            <select value={filterState} onChange={(e) => handleFilterChange(e.target.value as 'all' | 'open')}>
+              <option value="all">All Issues</option>
+              <option value="open">Open Only</option>
+            </select>
+          </div>
+          <div className="filter-group">
+            <label>Show:</label>
+            <select value={pageSize} onChange={(e) => handlePageSizeChange(parseInt(e.target.value, 10))}>
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+              <option value="100">100</option>
+              <option value="250">250</option>
+            </select>
+          </div>
+          <button className="btn-refresh" onClick={() => setRefreshTrigger(prev => prev + 1)}>
+            Refresh
+          </button>
+        </div>
+
         {loading && <p className="status-message">Loading issues...</p>}
         {error && <p className="status-message error">Error: {error}</p>}
 
@@ -306,7 +379,7 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {issues.map(issue => (
+                {issues.slice(0, pageSize).map(issue => (
                   <tr key={issue.id}>
                     <td data-label="Title">
                       <div className="title-container">

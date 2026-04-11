@@ -17,8 +17,8 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
     window.localStorage.setItem('jules_token', 'mock-jules-token');
   });
 
-  // Mock GitHub Global Issues API
-  await page.route('**/issues?state=all&filter=all*', async (route) => {
+  // Mock GitHub Issues API (now repo-specific)
+  await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -33,17 +33,6 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
           repository: { full_name: 'chatelao/AI-Dashboard' },
           assignee: { login: 'Jules' },
           labels: []
-        },
-        {
-          id: 2,
-          number: 102,
-          title: 'Labeled issue',
-          state: 'closed',
-          html_url: 'https://github.com/chatelao/other-repo/issues/102',
-          body: 'I have a label',
-          repository: { full_name: 'chatelao/other-repo' },
-          assignee: null,
-          labels: [{ name: 'Jules' }]
         }
       ])
     });
@@ -58,15 +47,6 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
     });
   });
 
-  // Mock Jules API for Issue 102
-  await page.route('**/v1/tasks/102/status', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({ status: 'Completed' })
-    });
-  });
-
   await page.goto('/');
 
   // Wait for the table to be visible
@@ -74,12 +54,7 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
   await expect(table).toBeVisible();
 
   // Verify Issue 101 status and repo name
-  const row101 = page.locator('tr', { has: page.locator('td').filter({ hasText: /Jules issue/ }) });
-  await expect(row101.locator('td').nth(0)).toContainText('[AI-Dashboard]');
-  await expect(row101.locator('td').nth(3)).toContainText('Coding');
-
-  // Verify Issue 102 status and repo name
-  const row102 = page.locator('tr', { has: page.locator('td').filter({ hasText: /Labeled issue/ }) });
-  await expect(row102.locator('td').nth(0)).toContainText('[other-repo]');
-  await expect(row102.locator('td').nth(3)).toContainText('Completed');
+  const row101 = page.locator('tr', { has: page.locator('td').filter({ hasText: /^101$/ }) });
+  await expect(row101.locator('td').nth(1)).toContainText('[AI-Dashboard]');
+  await expect(row101.locator('td').nth(5)).toContainText('Coding');
 });
