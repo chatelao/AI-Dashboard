@@ -256,7 +256,8 @@ a:hover {
 
 @media (max-width: 768px) {
   #root {
-    padding: 1rem;
+    padding: 1rem 0.5rem;
+    text-align: left;
   }
 
   header {
@@ -272,13 +273,80 @@ a:hover {
     font-size: 0.9rem;
   }
 
-  .table-container {
-    padding: 0.5rem;
+  .settings-actions {
+    flex-direction: column;
   }
 
-  th, td {
-    padding: 8px 10px;
+  .settings-actions button {
+    width: 100%;
+  }
+
+  .table-container {
+    padding: 0;
+    background-color: transparent;
+    box-shadow: none;
+    overflow-x: hidden;
+  }
+
+  table {
+    min-width: auto;
+  }
+
+  table, thead, tbody, th, td, tr {
+    display: block;
+  }
+
+  thead tr {
+    position: absolute;
+    top: -9999px;
+    left: -9999px;
+  }
+
+  tr {
+    background-color: #1a1a1a;
+    border-radius: 8px;
+    margin-bottom: 1rem;
+    padding: 0.5rem;
+    box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+    border: 1px solid #333;
+  }
+
+  td {
+    border: none;
+    border-bottom: 1px solid #333;
+    position: relative;
+    padding: 12px 10px 12px 40% !important;
+    text-align: right;
+    min-height: 2.5rem;
     font-size: 0.9rem;
+    word-break: break-word;
+  }
+
+  td:last-child {
+    border-bottom: none;
+  }
+
+  td::before {
+    content: attr(data-label);
+    position: absolute;
+    left: 10px;
+    width: 35%;
+    padding-right: 10px;
+    white-space: nowrap;
+    text-align: left;
+    font-weight: 600;
+    font-size: 0.75rem;
+    color: #aaa;
+    text-transform: uppercase;
+  }
+
+  .title-container {
+    text-align: right;
+  }
+
+  .pr-status-group,
+  .jules-status-group {
+    align-items: flex-end;
   }
 
   .badge {
