@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.DS_Store
+*.log
+playwright-report/
+test-results/
+test_out.txt
+test_out_3.log
+test_output.log
+test_output_2.log
+vite_dev*.log
+screenshot.png

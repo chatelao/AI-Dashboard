@@ -8,9 +8,15 @@ interface GitHubIssue {
   state: string;
   html_url: string;
   body: string | null;
+  repository: {
+    full_name: string;
+  };
   assignee: {
     login: string;
   } | null;
+  labels: {
+    name: string;
+  }[];
   pull_request?: {
     url: string;
     html_url: string;
@@ -39,15 +45,26 @@ function App() {
   const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [currentRepo, setCurrentRepo] = useState<string>(localStorage.getItem('current_repo') || 'chatelao/AI-Dashboard');
-  const [recentRepos, setRecentRepos] = useState<string[]>(JSON.parse(localStorage.getItem('recent_repos') || '["chatelao/AI-Dashboard"]'));
-  const [newRepoInput, setNewRepoInput] = useState<string>('');
-  const [newIssueTitle, setNewIssueTitle] = useState<string>('');
 
-  const getJulesStatus = (issueId: number) => {
-    const statuses = ["Researching", "Coding", "Testing", "Completed"];
-    // Deterministic mock status based on issue ID
-    return statuses[issueId % statuses.length];
+  const fetchJulesStatus = async (issueId: number, token: string): Promise<string | undefined> => {
+    try {
+      const response = await fetch(`${JULES_API_BASE_URL}/tasks/${issueId}/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        return undefined;
+      }
+      const data: unknown = await response.json();
+      if (data && typeof data === 'object' && 'status' in data && typeof data.status === 'string') {
+        return data.status;
+      }
+      return undefined;
+    } catch (err) {
+      console.error(`Failed to fetch Jules status for issue ${issueId}:`, err);
+      return undefined;
+    }
   };
 
   const handleSaveSettings = () => {
@@ -68,58 +85,6 @@ function App() {
     setShowSettings(false);
   };
 
-  const handleRepoChange = (repo: string) => {
-    setCurrentRepo(repo);
-    localStorage.setItem('current_repo', repo);
-  };
-
-  const handleAddRepo = () => {
-    if (newRepoInput && !recentRepos.includes(newRepoInput)) {
-      const updatedRepos = [...recentRepos, newRepoInput];
-      setRecentRepos(updatedRepos);
-      localStorage.setItem('recent_repos', JSON.stringify(updatedRepos));
-      handleRepoChange(newRepoInput);
-      setNewRepoInput('');
-    } else if (newRepoInput) {
-      handleRepoChange(newRepoInput);
-      setNewRepoInput('');
-    }
-  };
-
-  const handleCreateIssue = async () => {
-    if (!newIssueTitle) return;
-
-    try {
-      const headers: HeadersInit = {
-        'Content-Type': 'application/json'
-      };
-      if (ghToken) {
-        headers['Authorization'] = `token ${ghToken}`;
-      }
-
-      const response = await fetch(`https://api.github.com/repos/${currentRepo}/issues`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify({
-          title: newIssueTitle,
-          labels: ['Jules']
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to create issue');
-      }
-
-      setNewIssueTitle('');
-      // Refresh issues list by triggering useEffect
-      setRefreshTrigger(prev => prev + 1);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to create issue');
-    }
-  };
-
-  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
-
   useEffect(() => {
     const fetchIssues = async () => {
       try {
@@ -133,32 +98,51 @@ function App() {
           // Future integration: headers['X-Jules-Token'] = julesToken;
         }
 
-        const [issuesResponse, prsResponse] = await Promise.all([
-          fetch(`https://api.github.com/repos/${currentRepo}/issues?state=all`, { headers }),
-          fetch(`https://api.github.com/repos/${currentRepo}/pulls?state=all`, { headers })
-        ]);
-
-        if (!issuesResponse.ok || !prsResponse.ok) {
-          throw new Error('Failed to fetch data from GitHub');
+        let issuesData: GitHubIssue[] = [];
+        if (ghToken) {
+          // Fetch up to 3 pages (300 items) from global issues endpoint
+          for (let page = 1; page <= 3; page++) {
+            const response = await fetch(`https://api.github.com/issues?state=all&filter=all&per_page=100&page=${page}`, { headers });
+            if (!response.ok) {
+              if (page === 1) throw new Error('Failed to fetch data from GitHub');
+              break;
+            }
+            const data: GitHubIssue[] = await response.json();
+            if (data.length === 0) break;
+            issuesData = [...issuesData, ...data];
+            if (data.length < 100) break;
+          }
+        } else {
+          // Fallback to specific repo if no token
+          const response = await fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', { headers });
+          if (!response.ok) throw new Error('Failed to fetch data from GitHub');
+          const data: GitHubIssue[] = await response.json();
+          // Manually add repository info if missing
+          issuesData = data.map(item => ({
+            ...item,
+            repository: item.repository || { full_name: 'chatelao/AI-Dashboard' }
+          }));
         }
-
-        const issuesData: GitHubIssue[] = await issuesResponse.json();
-        const prsData: { number: number; head: { sha: string } }[] = await prsResponse.json();
-        const prMap = new Map(prsData.map((pr) => [pr.number, pr]));
 
         const processedItems = await Promise.all(issuesData.map(async (item) => {
           const updatedItem: IssueWithJulesStatus = { ...item };
 
-          if (item.assignee?.login === 'Jules' && item.state === 'open') {
-            updatedItem.julesStatus = getJulesStatus(item.id);
+          if (
+            (item.assignee?.login === 'Jules' || item.labels.some(l => l.name === 'Jules')) &&
+            julesToken
+          ) {
+            updatedItem.julesStatus = await fetchJulesStatus(item.number, julesToken);
           }
 
           if (item.pull_request) {
-            const pr = prMap.get(item.number);
-            if (pr) {
-              try {
+            try {
+              // Fetch full PR details to get head.sha
+              const prResponse = await fetch(item.pull_request.url, { headers });
+              if (prResponse.ok) {
+                const prDetail = await prResponse.json();
+                const sha = prDetail.head.sha;
                 const checkRunsResponse = await fetch(
-                  `https://api.github.com/repos/${currentRepo}/commits/${pr.head.sha}/check-runs`,
+                  `https://api.github.com/repos/${item.repository.full_name}/commits/${sha}/check-runs`,
                   { headers }
                 );
                 if (checkRunsResponse.ok) {
@@ -186,9 +170,9 @@ function App() {
                     label: 'Create'
                   };
                 }
-              } catch (err) {
-                console.error(`Failed to fetch check runs for PR #${item.number}`, err);
               }
+            } catch (err) {
+              console.error(`Failed to fetch check runs for PR #${item.number}`, err);
             }
           }
 
@@ -202,23 +186,24 @@ function App() {
         const issuesOnly = processedItems.filter(item => !item.pull_request);
         const prsOnly = processedItems.filter(item => item.pull_request);
 
-        // Map issues by number for easy lookup
-        const issuesByNumber = new Map(issuesOnly.map(issue => [issue.number, issue]));
+        // Map issues by repo#number for easy lookup
+        const issuesByNumber = new Map(issuesOnly.map(issue => [`${issue.repository.full_name}#${issue.number}`, issue]));
 
-        // Link PRs to issues
+        // Link PRs to issues (within the same repo)
         prsOnly.forEach(pr => {
           if (pr.body) {
             const regex = /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi;
             let match;
             while ((match = regex.exec(pr.body)) !== null) {
               const issueNumber = parseInt(match[1], 10);
-              const issue = issuesByNumber.get(issueNumber);
+              const issueKey = `${pr.repository.full_name}#${issueNumber}`;
+              const issue = issuesByNumber.get(issueKey);
               if (issue) {
                 if (!issue.linkedPRs) {
                   issue.linkedPRs = [];
                 }
                 issue.linkedPRs.push(pr);
-                linkedPrNumbers.add(pr.number);
+                linkedPrNumbers.add(pr.id); // Use ID because number might not be unique across repos
               }
             }
           }
@@ -227,7 +212,7 @@ function App() {
         // Combine all issues and unlinked PRs
         issuesOnly.forEach(issue => finalIssues.push(issue));
         prsOnly.forEach(pr => {
-          if (!linkedPrNumbers.has(pr.number)) {
+          if (!linkedPrNumbers.has(pr.id)) {
             finalIssues.push(pr);
           }
         });
@@ -241,14 +226,14 @@ function App() {
     };
 
     fetchIssues();
-  }, [ghToken, julesToken, currentRepo, refreshTrigger]);
+  }, [ghToken, julesToken]);
 
   return (
     <div className="dashboard">
       <header>
         <div className="header-content">
           <div>
-            <h1>AI-Dashboard: AI Development Dashboard</h1>
+            <h1>AI Development Dashboard</h1>
             <p>Unified view of GitHub Issues and Google Jules Statuses</p>
           </div>
           <button
@@ -260,41 +245,6 @@ function App() {
           </button>
         </div>
       </header>
-
-      <section className="controls-section">
-        <div className="controls-container">
-          <div className="controls-group">
-            <label htmlFor="repo-select">Repository:</label>
-            <select
-              id="repo-select"
-              value={currentRepo}
-              onChange={(e) => handleRepoChange(e.target.value)}
-            >
-              {recentRepos.map(repo => (
-                <option key={repo} value={repo}>{repo}</option>
-              ))}
-            </select>
-          </div>
-          <div className="controls-group">
-            <input
-              type="text"
-              value={newRepoInput}
-              onChange={(e) => setNewRepoInput(e.target.value)}
-              placeholder="owner/repo"
-            />
-            <button onClick={handleAddRepo}>Add Repository</button>
-          </div>
-          <div className="controls-group">
-            <input
-              type="text"
-              value={newIssueTitle}
-              onChange={(e) => setNewIssueTitle(e.target.value)}
-              placeholder="New issue title"
-            />
-            <button onClick={handleCreateIssue}>Create Jules Issue</button>
-          </div>
-        </div>
-      </section>
 
       {showSettings && (
         <section className="settings-panel">
@@ -351,7 +301,7 @@ function App() {
                     <td>
                       <div className="title-container">
                         <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
-                          [{currentRepo}] {issue.title}
+                          [{issue.repository.full_name.split('/')[1]}] {issue.title}
                         </a>
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
                           <div key={pr.id} className="subtitle">
@@ -426,13 +376,26 @@ function App() {
                       </div>
                     </td>
                     <td>
-                      {issue.julesStatus ? (
-                        <span className={`badge jules-status-${issue.julesStatus.toLowerCase()}`}>
-                          {issue.julesStatus}
-                        </span>
-                      ) : (
-                        <span className="text-muted">-</span>
-                      )}
+                      <div className="jules-status-group">
+                        {issue.julesStatus ? (
+                          <span className={`badge jules-status-${issue.julesStatus.toLowerCase()}`}>
+                            {issue.julesStatus}
+                          </span>
+                        ) : (
+                          (!issue.linkedPRs || issue.linkedPRs.every(pr => !pr.julesStatus)) && (
+                            <span className="text-muted">-</span>
+                          )
+                        )}
+                        {issue.linkedPRs && issue.linkedPRs.map(pr => (
+                          pr.julesStatus && (
+                            <div key={pr.id} className="subtitle">
+                              <span className={`badge jules-status-${pr.julesStatus.toLowerCase()}`}>
+                                {pr.julesStatus}
+                              </span>
+                            </div>
+                          )
+                        ))}
+                      </div>
                     </td>
                   </tr>
                 ))}
