@@ -43,6 +43,8 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [ghToken, setGhToken] = useState<string>(localStorage.getItem('github_token') || '');
   const [julesToken, setJulesToken] = useState<string>(localStorage.getItem('jules_token') || '');
+  const [filterState, setFilterState] = useState<string>(localStorage.getItem('filter_state') || 'open');
+  const [pageSize, setPageSize] = useState<number>(parseInt(localStorage.getItem('page_size') || '50', 10));
   const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
@@ -90,6 +92,16 @@ function App() {
     setDraftGhToken('');
     setDraftJulesToken('');
     setShowSettings(false);
+  };
+
+  const handleFilterChange = (newState: string) => {
+    setFilterState(newState);
+    localStorage.setItem('filter_state', newState);
+  };
+
+  const handlePageSizeChange = (newSize: number) => {
+    setPageSize(newSize);
+    localStorage.setItem('page_size', newSize.toString());
   };
 
   useEffect(() => {
@@ -291,6 +303,34 @@ function App() {
       )}
 
       <main>
+        <div className="filters-bar">
+          <div className="filter-group">
+            <label htmlFor="status-filter">Status:</label>
+            <select
+              id="status-filter"
+              value={filterState}
+              onChange={(e) => handleFilterChange(e.target.value)}
+            >
+              <option value="all">All</option>
+              <option value="open">Open</option>
+            </select>
+          </div>
+          <div className="filter-group">
+            <label htmlFor="page-size">Show:</label>
+            <select
+              id="page-size"
+              value={pageSize}
+              onChange={(e) => handlePageSizeChange(parseInt(e.target.value, 10))}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+              <option value={100}>100</option>
+              <option value={250}>250</option>
+            </select>
+          </div>
+        </div>
+
         {loading && <p className="status-message">Loading issues...</p>}
         {error && <p className="status-message error">Error: {error}</p>}
 
@@ -306,7 +346,10 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {issues.map(issue => (
+                {issues
+                  .filter(issue => filterState === 'all' || issue.state === filterState)
+                  .slice(0, pageSize)
+                  .map(issue => (
                   <tr key={issue.id}>
                     <td data-label="Title">
                       <div className="title-container">

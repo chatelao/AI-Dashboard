@@ -78,8 +78,50 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
   await expect(row101.locator('td').nth(0)).toContainText('[AI-Dashboard]');
   await expect(row101.locator('td').nth(3)).toContainText('Coding');
 
-  // Verify Issue 102 status and repo name
+  // Verify Issue 102 (closed) is NOT visible by default
   const row102 = page.locator('tr', { has: page.locator('td').filter({ hasText: /Labeled issue/ }) });
+  await expect(row102).not.toBeVisible();
+
+  // Switch filter to "all"
+  await page.selectOption('#status-filter', 'all');
+
+  // Verify Issue 102 status and repo name
   await expect(row102.locator('td').nth(0)).toContainText('[other-repo]');
   await expect(row102.locator('td').nth(3)).toContainText('Completed');
+});
+
+test('dashboard filters by page size', async ({ page }) => {
+  // Set mock tokens
+  await page.addInitScript(() => {
+    window.localStorage.setItem('github_token', 'mock-gh-token');
+  });
+
+  // Mock GitHub Global Issues API with 15 issues
+  await page.route('**/issues?state=all&filter=all*', async (route) => {
+    const issues = Array.from({ length: 15 }, (_, i) => ({
+      id: i + 1,
+      number: 100 + i,
+      title: `Issue ${i + 1}`,
+      state: 'open',
+      html_url: `https://github.com/chatelao/AI-Dashboard/issues/${100 + i}`,
+      repository: { full_name: 'chatelao/AI-Dashboard' },
+      labels: []
+    }));
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(issues)
+    });
+  });
+
+  await page.goto('/');
+
+  // Default page size is 50, so all 15 should be visible
+  await expect(page.locator('tbody tr')).toHaveCount(15);
+
+  // Change page size to 10
+  await page.selectOption('#page-size', '10');
+
+  // Verify only 10 issues are visible
+  await expect(page.locator('tbody tr')).toHaveCount(10);
 });
