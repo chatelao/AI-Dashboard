@@ -286,10 +286,8 @@ function App() {
             <table>
               <thead>
                 <tr>
-                  <th>#</th>
                   <th>Title</th>
                   <th>State</th>
-                  <th>Assignee</th>
                   <th>PR</th>
                   <th>Jules Status</th>
                 </tr>
@@ -297,7 +295,6 @@ function App() {
               <tbody>
                 {issues.map(issue => (
                   <tr key={issue.id}>
-                    <td>{issue.number}</td>
                     <td>
                       <div className="title-container">
                         <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
@@ -316,15 +313,6 @@ function App() {
                       <span className={`badge state-${issue.state}`}>
                         {issue.state}
                       </span>
-                    </td>
-                    <td>
-                      {issue.assignee ? (
-                        <span className="assignee-badge">
-                          {issue.assignee.login}
-                        </span>
-                      ) : (
-                        <span className="text-muted">-</span>
-                      )}
                     </td>
                     <td>
                       <div className="pr-status-group">
