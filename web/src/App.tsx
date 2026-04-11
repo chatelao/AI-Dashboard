@@ -76,7 +76,6 @@ function App() {
                   <th>#</th>
                   <th>Title</th>
                   <th>State</th>
-                  <th>Assignee</th>
                   <th>Jules Status</th>
                 </tr>
               </thead>
@@ -94,7 +93,6 @@ function App() {
                         {issue.state}
                       </span>
                     </td>
-                    <td>{issue.assignee?.login || 'Unassigned'}</td>
                     <td>
                       {issue.julesStatus ? (
                         <span className={`badge jules-status-${issue.julesStatus.toLowerCase()}`}>
