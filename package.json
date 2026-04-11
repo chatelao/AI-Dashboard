@@ -1,0 +1,12 @@
+{
+  "name": "ai-dashboard",
+  "version": "1.0.0",
+  "description": "Unified dashboard for tracking development progress",
+  "scripts": {
+    "dev": "cd web && npm run dev",
+    "test": "playwright test"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.59.1"
+  }
+}
