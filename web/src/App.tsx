@@ -7,6 +7,7 @@ interface GitHubIssue {
   title: string;
   state: string;
   html_url: string;
+  body: string | null;
   assignee: {
     login: string;
   } | null;
@@ -24,6 +25,7 @@ interface PRStatus {
 interface IssueWithJulesStatus extends GitHubIssue {
   julesStatus?: string;
   prStatus?: PRStatus;
+  linkedPRs?: IssueWithJulesStatus[];
 }
 
 const JULES_API_BASE_URL = 'https://jules.googleapis.com/v1';
@@ -88,15 +90,15 @@ function App() {
         const prsData: { number: number; head: { sha: string } }[] = await prsResponse.json();
         const prMap = new Map(prsData.map((pr) => [pr.number, pr]));
 
-        const processedIssues = await Promise.all(issuesData.map(async (issue) => {
-          const updatedIssue: IssueWithJulesStatus = { ...issue };
+        const processedItems = await Promise.all(issuesData.map(async (item) => {
+          const updatedItem: IssueWithJulesStatus = { ...item };
 
-          if (issue.assignee?.login === 'Jules' && issue.state === 'open') {
-            updatedIssue.julesStatus = getJulesStatus(issue.id);
+          if (item.assignee?.login === 'Jules' && item.state === 'open') {
+            updatedItem.julesStatus = getJulesStatus(item.id);
           }
 
-          if (issue.pull_request) {
-            const pr = prMap.get(issue.number);
+          if (item.pull_request) {
+            const pr = prMap.get(item.number);
             if (pr) {
               try {
                 const checkRunsResponse = await fetch(
@@ -123,21 +125,58 @@ function App() {
                     }
                   }
 
-                  updatedIssue.prStatus = {
+                  updatedItem.prStatus = {
                     color,
                     label: 'Create'
                   };
                 }
               } catch (err) {
-                console.error(`Failed to fetch check runs for PR #${issue.number}`, err);
+                console.error(`Failed to fetch check runs for PR #${item.number}`, err);
               }
             }
           }
 
-          return updatedIssue;
+          return updatedItem;
         }));
 
-        setIssues(processedIssues);
+        const finalIssues: IssueWithJulesStatus[] = [];
+        const linkedPrNumbers = new Set<number>();
+
+        // First, separate issues and PRs
+        const issuesOnly = processedItems.filter(item => !item.pull_request);
+        const prsOnly = processedItems.filter(item => item.pull_request);
+
+        // Map issues by number for easy lookup
+        const issuesByNumber = new Map(issuesOnly.map(issue => [issue.number, issue]));
+
+        // Link PRs to issues
+        prsOnly.forEach(pr => {
+          if (pr.body) {
+            const regex = /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi;
+            let match;
+            while ((match = regex.exec(pr.body)) !== null) {
+              const issueNumber = parseInt(match[1], 10);
+              const issue = issuesByNumber.get(issueNumber);
+              if (issue) {
+                if (!issue.linkedPRs) {
+                  issue.linkedPRs = [];
+                }
+                issue.linkedPRs.push(pr);
+                linkedPrNumbers.add(pr.number);
+              }
+            }
+          }
+        });
+
+        // Combine all issues and unlinked PRs
+        issuesOnly.forEach(issue => finalIssues.push(issue));
+        prsOnly.forEach(pr => {
+          if (!linkedPrNumbers.has(pr.number)) {
+            finalIssues.push(pr);
+          }
+        });
+
+        setIssues(finalIssues);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
@@ -219,9 +258,18 @@ function App() {
                   <tr key={issue.id}>
                     <td>{issue.number}</td>
                     <td>
-                      <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
-                        [AI-Dashboard] {issue.title}
-                      </a>
+                      <div className="title-container">
+                        <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
+                          [AI-Dashboard] {issue.title}
+                        </a>
+                        {issue.linkedPRs && issue.linkedPRs.map(pr => (
+                          <div key={pr.id} className="subtitle">
+                            <a href={pr.html_url} target="_blank" rel="noopener noreferrer">
+                              PR #{pr.number}: {pr.title}
+                            </a>
+                          </div>
+                        ))}
+                      </div>
                     </td>
                     <td>
                       <span className={`badge state-${issue.state}`}>
@@ -229,28 +277,62 @@ function App() {
                       </span>
                     </td>
                     <td>
-                      {issue.prStatus ? (
-                        <div className="pr-status-container">
-                          <svg
-                            className={`pr-icon pr-icon-${issue.prStatus.color}`}
-                            viewBox="0 0 16 16"
-                            version="1.1"
-                            width="16"
-                            height="16"
-                            aria-hidden="true"
-                          >
-                            <path
-                              fillRule="evenodd"
-                              d="M7.177 3.03a.75.75 0 11-1.354-.645 2.75 2.75 0 015.162 1.377 2.25 2.25 0 01-.89 4.113 2.25 2.25 0 011.655 2.175v.25a2.25 2.25 0 11-4.5 0v-.25c0-.97.615-1.798 1.48-2.122a2.75 2.75 0 00-1.553-4.898zM9 10.25a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z"
-                            ></path>
-                          </svg>
-                          <span className={`pr-label pr-label-${issue.prStatus.color}`}>
-                            {issue.prStatus.label}
-                          </span>
-                        </div>
+                      {issue.assignee ? (
+                        <span className="assignee-badge">
+                          {issue.assignee.login}
+                        </span>
                       ) : (
                         <span className="text-muted">-</span>
                       )}
+                    </td>
+                    <td>
+                      <div className="pr-status-group">
+                        {issue.prStatus && (
+                          <div className="pr-status-container">
+                            <svg
+                              className={`pr-icon pr-icon-${issue.prStatus.color}`}
+                              viewBox="0 0 16 16"
+                              version="1.1"
+                              width="16"
+                              height="16"
+                              aria-hidden="true"
+                            >
+                              <path
+                                fillRule="evenodd"
+                                d="M7.177 3.03a.75.75 0 11-1.354-.645 2.75 2.75 0 015.162 1.377 2.25 2.25 0 01-.89 4.113 2.25 2.25 0 011.655 2.175v.25a2.25 2.25 0 11-4.5 0v-.25c0-.97.615-1.798 1.48-2.122a2.75 2.75 0 00-1.553-4.898zM9 10.25a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z"
+                              ></path>
+                            </svg>
+                            <span className={`pr-label pr-label-${issue.prStatus.color}`}>
+                              {issue.prStatus.label}
+                            </span>
+                          </div>
+                        )}
+                        {issue.linkedPRs && issue.linkedPRs.map(pr => (
+                          pr.prStatus && (
+                            <div key={pr.id} className="pr-status-container subtitle">
+                              <svg
+                                className={`pr-icon pr-icon-${pr.prStatus.color}`}
+                                viewBox="0 0 16 16"
+                                version="1.1"
+                                width="16"
+                                height="16"
+                                aria-hidden="true"
+                              >
+                                <path
+                                  fillRule="evenodd"
+                                  d="M7.177 3.03a.75.75 0 11-1.354-.645 2.75 2.75 0 015.162 1.377 2.25 2.25 0 01-.89 4.113 2.25 2.25 0 011.655 2.175v.25a2.25 2.25 0 11-4.5 0v-.25c0-.97.615-1.798 1.48-2.122a2.75 2.75 0 00-1.553-4.898zM9 10.25a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z"
+                                ></path>
+                              </svg>
+                              <span className={`pr-label pr-label-${pr.prStatus.color}`}>
+                                {pr.prStatus.label}
+                              </span>
+                            </div>
+                          )
+                        ))}
+                        {!issue.prStatus && (!issue.linkedPRs || issue.linkedPRs.length === 0) && (
+                          <span className="text-muted">-</span>
+                        )}
+                      </div>
                     </td>
                     <td>
                       {issue.julesStatus ? (
