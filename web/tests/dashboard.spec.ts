@@ -15,7 +15,8 @@ test.describe('Dashboard Consolidation', () => {
             state: 'open',
             html_url: 'https://github.com/chatelao/AI-Dashboard/issues/101',
             body: 'Detailed description',
-            assignee: null
+            assignee: null,
+            labels: []
           },
           {
             id: 2,
@@ -25,6 +26,7 @@ test.describe('Dashboard Consolidation', () => {
             html_url: 'https://github.com/chatelao/AI-Dashboard/pull/102',
             body: 'Fixes #101',
             assignee: null,
+            labels: [],
             pull_request: { url: '...', html_url: '...' }
           },
           {
@@ -35,6 +37,7 @@ test.describe('Dashboard Consolidation', () => {
             html_url: 'https://github.com/chatelao/AI-Dashboard/pull/103',
             body: 'Just a PR',
             assignee: null,
+            labels: [],
             pull_request: { url: '...', html_url: '...' }
           }
         ])
@@ -115,7 +118,8 @@ test.describe('Dashboard Consolidation', () => {
             state: 'open',
             html_url: 'https://github.com/chatelao/AI-Dashboard/issues/201',
             body: 'Help me Jules',
-            assignee: { login: 'Jules' }
+            assignee: { login: 'Jules' },
+            labels: []
           },
           {
             id: 202,
@@ -125,6 +129,7 @@ test.describe('Dashboard Consolidation', () => {
             html_url: 'https://github.com/chatelao/AI-Dashboard/pull/202',
             body: 'Fixes #201',
             assignee: { login: 'Jules' },
+            labels: [],
             pull_request: { url: '...', html_url: '...' }
           }
         ])

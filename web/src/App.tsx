@@ -11,6 +11,9 @@ interface GitHubIssue {
   assignee: {
     login: string;
   } | null;
+  labels: {
+    name: string;
+  }[];
   pull_request?: {
     url: string;
     html_url: string;
@@ -108,8 +111,11 @@ function App() {
         const processedItems = await Promise.all(issuesData.map(async (item) => {
           const updatedItem: IssueWithJulesStatus = { ...item };
 
-          if (item.assignee?.login === 'Jules' && item.state === 'open' && julesToken) {
-            updatedItem.julesStatus = await fetchJulesStatus(item.id, julesToken);
+          if (
+            (item.assignee?.login === 'Jules' || item.labels.some(l => l.name === 'Jules')) &&
+            julesToken
+          ) {
+            updatedItem.julesStatus = await fetchJulesStatus(item.number, julesToken);
           }
 
           if (item.pull_request) {
