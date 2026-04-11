@@ -30,6 +30,8 @@ function App() {
   const [issues, setIssues] = useState<IssueWithJulesStatus[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'open'>('all');
+  const [pageSize, setPageSize] = useState<number>(20);
 
   const getJulesStatus = (issueId: number) => {
     const statuses = ["Researching", "Coding", "Testing", "Completed"];
@@ -40,17 +42,25 @@ function App() {
   useEffect(() => {
     const fetchIssues = async () => {
       try {
-        const [issuesResponse, prsResponse] = await Promise.all([
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all'),
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all')
+        const fetchGitHubData = async (endpoint: string) => {
+          let allData: unknown[] = [];
+          for (let page = 1; page <= 3; page++) {
+            const response = await fetch(`https://api.github.com/repos/chatelao/AI-Dashboard/${endpoint}${endpoint.includes('?') ? '&' : '?'}per_page=100&page=${page}`);
+            if (!response.ok) throw new Error('Failed to fetch data from GitHub');
+            const data = await response.json();
+            allData = [...allData, ...data];
+            if (data.length < 100) break;
+          }
+          return allData;
+        };
+
+        const [issuesDataRaw, prsDataRaw] = await Promise.all([
+          fetchGitHubData('issues?state=all'),
+          fetchGitHubData('pulls?state=all')
         ]);
 
-        if (!issuesResponse.ok || !prsResponse.ok) {
-          throw new Error('Failed to fetch data from GitHub');
-        }
-
-        const issuesData: GitHubIssue[] = await issuesResponse.json();
-        const prsData: { number: number; head: { sha: string } }[] = await prsResponse.json();
+        const issuesData = issuesDataRaw as GitHubIssue[];
+        const prsData = prsDataRaw as { number: number; head: { sha: string } }[];
         const prMap = new Map(prsData.map((pr) => [pr.number, pr]));
 
         const processedIssues = await Promise.all(issuesData.map(async (issue) => {
@@ -110,6 +120,10 @@ function App() {
     fetchIssues();
   }, []);
 
+  const filteredIssues = issues
+    .filter(issue => filterStatus === 'all' || issue.state === filterStatus)
+    .slice(0, pageSize);
+
   return (
     <div className="dashboard">
       <header>
@@ -120,6 +134,36 @@ function App() {
       <main>
         {loading && <p className="status-message">Loading issues...</p>}
         {error && <p className="status-message error">Error: {error}</p>}
+
+        {!loading && !error && (
+          <div className="controls-container">
+            <div className="control-group">
+              <label htmlFor="filterStatus">Status:</label>
+              <select
+                id="filterStatus"
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value as 'all' | 'open')}
+              >
+                <option value="all">All</option>
+                <option value="open">Only Open</option>
+              </select>
+            </div>
+            <div className="control-group">
+              <label htmlFor="pageSize">Show entries:</label>
+              <select
+                id="pageSize"
+                value={pageSize}
+                onChange={(e) => setPageSize(Number(e.target.value))}
+              >
+                <option value="10">10</option>
+                <option value="20">20</option>
+                <option value="50">50</option>
+                <option value="100">100</option>
+                <option value="250">250</option>
+              </select>
+            </div>
+          </div>
+        )}
 
         {!loading && !error && (
           <div className="table-container">
@@ -135,7 +179,7 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {issues.map(issue => (
+                {filteredIssues.map(issue => (
                   <tr key={issue.id}>
                     <td>{issue.number}</td>
                     <td>
