@@ -40,10 +40,25 @@ function App() {
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
-  const getJulesStatus = (issueId: number) => {
-    const statuses = ["Researching", "Coding", "Testing", "Completed"];
-    // Deterministic mock status based on issue ID
-    return statuses[issueId % statuses.length];
+  const fetchJulesStatus = async (issueId: number, token: string): Promise<string | undefined> => {
+    try {
+      const response = await fetch(`${JULES_API_BASE_URL}/tasks/${issueId}/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        return undefined;
+      }
+      const data: unknown = await response.json();
+      if (data && typeof data === 'object' && 'status' in data && typeof data.status === 'string') {
+        return data.status;
+      }
+      return undefined;
+    } catch (err) {
+      console.error(`Failed to fetch Jules status for issue ${issueId}:`, err);
+      return undefined;
+    }
   };
 
   const handleSaveSettings = () => {
@@ -93,8 +108,8 @@ function App() {
         const processedItems = await Promise.all(issuesData.map(async (item) => {
           const updatedItem: IssueWithJulesStatus = { ...item };
 
-          if (item.assignee?.login === 'Jules' && item.state === 'open') {
-            updatedItem.julesStatus = getJulesStatus(item.id);
+          if (item.assignee?.login === 'Jules' && item.state === 'open' && julesToken) {
+            updatedItem.julesStatus = await fetchJulesStatus(item.id, julesToken);
           }
 
           if (item.pull_request) {
@@ -335,13 +350,26 @@ function App() {
                       </div>
                     </td>
                     <td>
-                      {issue.julesStatus ? (
-                        <span className={`badge jules-status-${issue.julesStatus.toLowerCase()}`}>
-                          {issue.julesStatus}
-                        </span>
-                      ) : (
-                        <span className="text-muted">-</span>
-                      )}
+                      <div className="jules-status-group">
+                        {issue.julesStatus ? (
+                          <span className={`badge jules-status-${issue.julesStatus.toLowerCase()}`}>
+                            {issue.julesStatus}
+                          </span>
+                        ) : (
+                          (!issue.linkedPRs || issue.linkedPRs.every(pr => !pr.julesStatus)) && (
+                            <span className="text-muted">-</span>
+                          )
+                        )}
+                        {issue.linkedPRs && issue.linkedPRs.map(pr => (
+                          pr.julesStatus && (
+                            <div key={pr.id} className="subtitle">
+                              <span className={`badge jules-status-${pr.julesStatus.toLowerCase()}`}>
+                                {pr.julesStatus}
+                              </span>
+                            </div>
+                          )
+                        ))}
+                      </div>
                     </td>
                   </tr>
                 ))}

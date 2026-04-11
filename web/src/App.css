@@ -247,7 +247,8 @@ a:hover {
   color: #58a6ff;
 }
 
-.pr-status-group {
+.pr-status-group,
+.jules-status-group {
   display: flex;
   flex-direction: column;
   gap: 4px;
