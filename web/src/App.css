@@ -1,7 +1,7 @@
 #root {
   max-width: 1280px;
   margin: 0 auto;
-  padding: 2rem;
+  padding: 1rem 2rem;
   text-align: center;
 }
 
@@ -10,7 +10,117 @@
 }
 
 header {
+  margin-bottom: 1rem;
+}
+
+.header-content {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  text-align: left;
+}
+
+.settings-toggle {
+  background: none;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 8px;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: background-color 0.2s;
+}
+
+.settings-toggle:hover {
+  background-color: #333;
+}
+
+.settings-panel {
+  background-color: #1a1a1a;
+  border: 1px solid #333;
+  border-radius: 8px;
+  padding: 1.5rem;
   margin-bottom: 2rem;
+  text-align: left;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+.settings-panel h2 {
+  margin-top: 0;
+  margin-bottom: 1.5rem;
+  font-size: 1.2rem;
+  color: #fff;
+}
+
+.settings-group {
+  margin-bottom: 1rem;
+}
+
+.settings-group label {
+  display: block;
+  margin-bottom: 0.5rem;
+  font-size: 0.9rem;
+  color: #aaa;
+}
+
+.settings-group input {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-family: inherit;
+  box-sizing: border-box;
+}
+
+.settings-group input:focus {
+  outline: none;
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
+}
+
+.settings-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 1.5rem;
+}
+
+.settings-actions button {
+  padding: 8px 16px;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+  border: 1px solid transparent;
+}
+
+.btn-save {
+  background-color: #238636;
+  color: white;
+}
+
+.btn-save:hover {
+  background-color: #2ea043;
+}
+
+.btn-clear {
+  background-color: transparent;
+  border-color: #f85149 !important;
+  color: #f85149;
+}
+
+.btn-clear:hover {
+  background-color: rgba(248, 81, 73, 0.1);
+}
+
+.btn-cancel {
+  background-color: transparent;
+  border-color: #30363d !important;
+  color: #c9d1d9;
+}
+
+.btn-cancel:hover {
+  background-color: #30363d;
 }
 
 .status-message {
@@ -28,12 +138,15 @@ header {
   border-radius: 8px;
   padding: 1rem;
   box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  width: 100%;
+  box-sizing: border-box;
 }
 
 table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+  min-width: 600px;
 }
 
 th, td {
@@ -86,4 +199,89 @@ a:hover {
 
 .text-muted {
   color: #666;
+}
+
+.pr-status-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pr-icon {
+  flex-shrink: 0;
+}
+
+.pr-icon-black { fill: #8b949e; }
+.pr-icon-green { fill: #3fb950; }
+.pr-icon-red { fill: #f85149; }
+.pr-icon-yellow { fill: #d29922; }
+
+.pr-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.pr-label-black { color: #8b949e; }
+.pr-label-green { color: #3fb950; }
+.pr-label-red { color: #f85149; }
+.pr-label-yellow { color: #d29922; }
+
+.title-container {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  text-align: left;
+}
+
+.subtitle {
+  font-size: 0.85rem;
+  opacity: 0.8;
+  margin-top: 2px;
+}
+
+.subtitle a {
+  color: #8b949e;
+}
+
+.subtitle a:hover {
+  color: #58a6ff;
+}
+
+.pr-status-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+@media (max-width: 768px) {
+  #root {
+    padding: 1rem;
+  }
+
+  header {
+    margin-bottom: 1rem;
+  }
+
+  h1 {
+    font-size: 1.5rem;
+    margin: 0.5rem 0;
+  }
+
+  header p {
+    font-size: 0.9rem;
+  }
+
+  .table-container {
+    padding: 0.5rem;
+  }
+
+  th, td {
+    padding: 8px 10px;
+    font-size: 0.9rem;
+  }
+
+  .badge {
+    padding: 2px 6px;
+    font-size: 0.75rem;
+  }
 }
