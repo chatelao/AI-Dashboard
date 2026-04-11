@@ -16,7 +16,8 @@ test.describe('Dashboard Consolidation', () => {
             html_url: 'https://github.com/chatelao/AI-Dashboard/issues/101',
             body: 'Detailed description',
             assignee: null,
-            labels: []
+            labels: [],
+            repository: { full_name: 'chatelao/AI-Dashboard' }
           },
           {
             id: 2,
@@ -27,7 +28,8 @@ test.describe('Dashboard Consolidation', () => {
             body: 'Fixes #101',
             assignee: null,
             labels: [],
-            pull_request: { url: '...', html_url: '...' }
+            repository: { full_name: 'chatelao/AI-Dashboard' },
+            pull_request: { url: 'https://api.github.com/repos/chatelao/AI-Dashboard/pulls/102', html_url: 'https://github.com/chatelao/AI-Dashboard/pull/102' }
           },
           {
             id: 3,
@@ -38,21 +40,28 @@ test.describe('Dashboard Consolidation', () => {
             body: 'Just a PR',
             assignee: null,
             labels: [],
-            pull_request: { url: '...', html_url: '...' }
+            repository: { full_name: 'chatelao/AI-Dashboard' },
+            pull_request: { url: 'https://api.github.com/repos/chatelao/AI-Dashboard/pulls/103', html_url: 'https://github.com/chatelao/AI-Dashboard/pull/103' }
           }
         ])
       });
     });
 
-    // Mock GitHub Pulls API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', async (route) => {
+    // Mock GitHub Pull Detail API for PR 102
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls/102', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([
-          { number: 102, head: { sha: 'sha102' } },
-          { number: 103, head: { sha: 'sha103' } }
-        ])
+        body: JSON.stringify({ number: 102, head: { sha: 'sha102' } })
+      });
+    });
+
+    // Mock GitHub Pull Detail API for PR 103
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls/103', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ number: 103, head: { sha: 'sha103' } })
       });
     });
 
@@ -119,7 +128,8 @@ test.describe('Dashboard Consolidation', () => {
             html_url: 'https://github.com/chatelao/AI-Dashboard/issues/201',
             body: 'Help me Jules',
             assignee: { login: 'Jules' },
-            labels: []
+            labels: [],
+            repository: { full_name: 'chatelao/AI-Dashboard' }
           },
           {
             id: 202,
@@ -130,20 +140,31 @@ test.describe('Dashboard Consolidation', () => {
             body: 'Fixes #201',
             assignee: { login: 'Jules' },
             labels: [],
-            pull_request: { url: '...', html_url: '...' }
+            repository: { full_name: 'chatelao/AI-Dashboard' },
+            pull_request: { url: 'https://api.github.com/repos/chatelao/AI-Dashboard/pulls/202', html_url: 'https://github.com/chatelao/AI-Dashboard/pull/202' }
           }
         ])
       });
     });
 
-    // Mock GitHub Pulls API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', async (route) => {
+    // Mock GitHub Pull Detail API for PR 202
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls/202', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([
-          { number: 202, head: { sha: 'sha202' } }
-        ])
+        body: JSON.stringify({ number: 202, head: { sha: 'sha202' } })
+      });
+    });
+
+    // Mock Check Runs API for PR 202
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/commits/sha202/check-runs', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          total_count: 0,
+          check_runs: []
+        })
       });
     });
 
@@ -174,5 +195,49 @@ test.describe('Dashboard Consolidation', () => {
 
     // Verify Linked PR 202 status (as subtitle in Jules Status column)
     await expect(issueRow.locator('td').nth(5).locator('.subtitle')).toContainText('Researching');
+  });
+
+  test('should display Jules status for items with lowercase "jules" label', async ({ page }) => {
+    // Set mock jules_token
+    await page.addInitScript(() => {
+      window.localStorage.setItem('jules_token', 'mock-jules-token');
+    });
+
+    // Mock GitHub Issues API
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 301,
+            number: 301,
+            title: 'Lowercase Jules label',
+            state: 'open',
+            html_url: 'https://github.com/chatelao/AI-Dashboard/issues/301',
+            body: 'Help me lowercase jules',
+            assignee: null,
+            labels: [{ name: 'jules' }],
+            repository: { full_name: 'chatelao/AI-Dashboard' }
+          }
+        ])
+      });
+    });
+
+    // Mock Jules API for Issue 301
+    await page.route('https://jules.googleapis.com/v1/tasks/301/status', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ status: 'Testing' })
+      });
+    });
+
+    await page.goto('/');
+
+    const issueRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /^301$/ }) });
+
+    // Verify Issue 301 status
+    await expect(issueRow.locator('td').nth(5)).toContainText('Testing');
   });
 });
