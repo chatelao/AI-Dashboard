@@ -3,57 +3,67 @@ import { test, expect } from '@playwright/test';
 test.describe('Dashboard Consolidation', () => {
   test('should consolidate PRs into issues as subtitles', async ({ page }) => {
     // Mock GitHub Issues API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([
-          {
-            id: 1,
-            number: 101,
-            title: 'Fix a bug',
-            state: 'open',
-            html_url: 'https://github.com/chatelao/AI-Dashboard/issues/101',
-            body: 'Detailed description',
-            assignee: null,
-            labels: []
-          },
-          {
-            id: 2,
-            number: 102,
-            title: 'A linked PR',
-            state: 'open',
-            html_url: 'https://github.com/chatelao/AI-Dashboard/pull/102',
-            body: 'Fixes #101',
-            assignee: null,
-            labels: [],
-            pull_request: { url: '...', html_url: '...' }
-          },
-          {
-            id: 3,
-            number: 103,
-            title: 'Unlinked PR',
-            state: 'open',
-            html_url: 'https://github.com/chatelao/AI-Dashboard/pull/103',
-            body: 'Just a PR',
-            assignee: null,
-            labels: [],
-            pull_request: { url: '...', html_url: '...' }
-          }
-        ])
-      });
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('page') === '1') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              id: 1,
+              number: 101,
+              title: 'Fix a bug',
+              state: 'open',
+              html_url: 'https://github.com/chatelao/AI-Dashboard/issues/101',
+              body: 'Detailed description',
+              assignee: null,
+              labels: []
+            },
+            {
+              id: 2,
+              number: 102,
+              title: 'A linked PR',
+              state: 'open',
+              html_url: 'https://github.com/chatelao/AI-Dashboard/pull/102',
+              body: 'Fixes #101',
+              assignee: null,
+              labels: [],
+              pull_request: { url: '...', html_url: '...' }
+            },
+            {
+              id: 3,
+              number: 103,
+              title: 'Unlinked PR',
+              state: 'open',
+              html_url: 'https://github.com/chatelao/AI-Dashboard/pull/103',
+              body: 'Just a PR',
+              assignee: null,
+              labels: [],
+              pull_request: { url: '...', html_url: '...' }
+            }
+          ])
+        });
+      } else {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      }
     });
 
     // Mock GitHub Pulls API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([
-          { number: 102, head: { sha: 'sha102' } },
-          { number: 103, head: { sha: 'sha103' } }
-        ])
-      });
+    await page.route('**/repos/chatelao/AI-Dashboard/pulls?state=all*', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('page') === '1') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            { number: 102, head: { sha: 'sha102' } },
+            { number: 103, head: { sha: 'sha103' } }
+          ])
+        });
+      } else {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      }
     });
 
     // Mock Check Runs API for PR 102
@@ -106,45 +116,55 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Issues API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([
-          {
-            id: 201,
-            number: 201,
-            title: 'Jules issue',
-            state: 'open',
-            html_url: 'https://github.com/chatelao/AI-Dashboard/issues/201',
-            body: 'Help me Jules',
-            assignee: { login: 'Jules' },
-            labels: []
-          },
-          {
-            id: 202,
-            number: 202,
-            title: 'Jules PR',
-            state: 'open',
-            html_url: 'https://github.com/chatelao/AI-Dashboard/pull/202',
-            body: 'Fixes #201',
-            assignee: { login: 'Jules' },
-            labels: [],
-            pull_request: { url: '...', html_url: '...' }
-          }
-        ])
-      });
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('page') === '1') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            {
+              id: 201,
+              number: 201,
+              title: 'Jules issue',
+              state: 'open',
+              html_url: 'https://github.com/chatelao/AI-Dashboard/issues/201',
+              body: 'Help me Jules',
+              assignee: { login: 'Jules' },
+              labels: []
+            },
+            {
+              id: 202,
+              number: 202,
+              title: 'Jules PR',
+              state: 'open',
+              html_url: 'https://github.com/chatelao/AI-Dashboard/pull/202',
+              body: 'Fixes #201',
+              assignee: { login: 'Jules' },
+              labels: [],
+              pull_request: { url: '...', html_url: '...' }
+            }
+          ])
+        });
+      } else {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      }
     });
 
     // Mock GitHub Pulls API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', async (route) => {
-      await route.fulfill({
-        status: 200,
-        contentType: 'application/json',
-        body: JSON.stringify([
-          { number: 202, head: { sha: 'sha202' } }
-        ])
-      });
+    await page.route('**/repos/chatelao/AI-Dashboard/pulls?state=all*', async (route) => {
+      const url = new URL(route.request().url());
+      if (url.searchParams.get('page') === '1') {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([
+            { number: 202, head: { sha: 'sha202' } }
+          ])
+        });
+      } else {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+      }
     });
 
     // Mock Jules API for Issue 201

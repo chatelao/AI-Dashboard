@@ -43,6 +43,18 @@ function App() {
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
+  // Repository and issue creation state
+  const [currentRepo, setCurrentRepo] = useState<string>(
+    localStorage.getItem('current_gh_repo') || 'chatelao/AI-Dashboard'
+  );
+  const [recentRepos, setRecentRepos] = useState<string[]>(() => {
+    const saved = localStorage.getItem('gh_repos');
+    return saved ? JSON.parse(saved) : ['chatelao/AI-Dashboard'];
+  });
+  const [newRepoInput, setNewRepoInput] = useState<string>('');
+  const [newIssueTitle, setNewIssueTitle] = useState<string>('');
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
   const fetchJulesStatus = async (issueId: number, token: string): Promise<string | undefined> => {
     try {
       const response = await fetch(`${JULES_API_BASE_URL}/tasks/${issueId}/status`, {
@@ -82,30 +94,92 @@ function App() {
     setShowSettings(false);
   };
 
+  const handleRepoChange = (repo: string) => {
+    setCurrentRepo(repo);
+    localStorage.setItem('current_gh_repo', repo);
+  };
+
+  const handleAddRepo = () => {
+    if (newRepoInput && !recentRepos.includes(newRepoInput)) {
+      const updatedRepos = [newRepoInput, ...recentRepos].slice(0, 10);
+      setRecentRepos(updatedRepos);
+      localStorage.setItem('gh_repos', JSON.stringify(updatedRepos));
+      handleRepoChange(newRepoInput);
+      setNewRepoInput('');
+    }
+  };
+
+  const handleCreateIssue = async () => {
+    if (!newIssueTitle || !ghToken) return;
+
+    try {
+      const response = await fetch(`https://api.github.com/repos/${currentRepo}/issues`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${ghToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: newIssueTitle,
+          labels: ['Jules']
+        })
+      });
+
+      if (response.ok) {
+        setNewIssueTitle('');
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        const data: unknown = await response.json();
+        console.error('Failed to create issue:', data);
+        alert('Failed to create issue. Check console for details.');
+      }
+    } catch (err) {
+      console.error('Error creating issue:', err);
+      alert('An error occurred while creating the issue.');
+    }
+  };
+
   useEffect(() => {
     const fetchIssues = async () => {
+      setLoading(true);
+      setError(null);
       try {
         const headers: HeadersInit = {};
         if (ghToken) {
           headers['Authorization'] = `token ${ghToken}`;
         }
 
-        if (julesToken) {
-          console.log(`Using Jules API at ${JULES_API_BASE_URL}`);
-          // Future integration: headers['X-Jules-Token'] = julesToken;
+        // Fetch up to 3 pages (300 items)
+        const issuesData: GitHubIssue[] = [];
+        const prsData: { number: number; head: { sha: string } }[] = [];
+
+        for (let page = 1; page <= 3; page++) {
+          try {
+            const [issuesRes, prsRes] = await Promise.all([
+              fetch(`https://api.github.com/repos/${currentRepo}/issues?state=all&per_page=100&page=${page}`, { headers }),
+              fetch(`https://api.github.com/repos/${currentRepo}/pulls?state=all&per_page=100&page=${page}`, { headers })
+            ]);
+
+            if (issuesRes.status === 404 || prsRes.status === 404) {
+              if (page === 1) throw new Error('Repository not found');
+              break;
+            }
+
+            if (!issuesRes.ok || !prsRes.ok) break;
+
+            const pageIssues: GitHubIssue[] = await issuesRes.json();
+            const pagePrs: { number: number; head: { sha: string } }[] = await prsRes.json();
+
+            issuesData.push(...pageIssues);
+            prsData.push(...pagePrs);
+
+            if (pageIssues.length < 100 && pagePrs.length < 100) break;
+          } catch (err) {
+            console.error(`Failed to fetch page ${page}:`, err);
+            if (page === 1) throw err;
+            break;
+          }
         }
-
-        const [issuesResponse, prsResponse] = await Promise.all([
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', { headers }),
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', { headers })
-        ]);
-
-        if (!issuesResponse.ok || !prsResponse.ok) {
-          throw new Error('Failed to fetch data from GitHub');
-        }
-
-        const issuesData: GitHubIssue[] = await issuesResponse.json();
-        const prsData: { number: number; head: { sha: string } }[] = await prsResponse.json();
         const prMap = new Map(prsData.map((pr) => [pr.number, pr]));
 
         const processedItems = await Promise.all(issuesData.map(async (item) => {
@@ -123,7 +197,7 @@ function App() {
             if (pr) {
               try {
                 const checkRunsResponse = await fetch(
-                  `https://api.github.com/repos/chatelao/AI-Dashboard/commits/${pr.head.sha}/check-runs`,
+                  `https://api.github.com/repos/${currentRepo}/commits/${pr.head.sha}/check-runs`,
                   { headers }
                 );
                 if (checkRunsResponse.ok) {
@@ -206,7 +280,7 @@ function App() {
     };
 
     fetchIssues();
-  }, [ghToken, julesToken]);
+  }, [ghToken, julesToken, currentRepo, refreshTrigger]);
 
   return (
     <div className="dashboard">
@@ -258,6 +332,44 @@ function App() {
       )}
 
       <main>
+        <div className="controls-container">
+          <div className="repo-selector">
+            <label htmlFor="repo-select">Repository:</label>
+            <select
+              id="repo-select"
+              value={currentRepo}
+              onChange={(e) => handleRepoChange(e.target.value)}
+            >
+              {recentRepos.map(repo => (
+                <option key={repo} value={repo}>{repo}</option>
+              ))}
+            </select>
+            <div className="add-repo">
+              <input
+                type="text"
+                placeholder="owner/repo"
+                value={newRepoInput}
+                onChange={(e) => setNewRepoInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleAddRepo()}
+              />
+              <button onClick={handleAddRepo}>Add</button>
+            </div>
+          </div>
+
+          <div className="issue-creator">
+            <input
+              type="text"
+              placeholder="New issue title..."
+              value={newIssueTitle}
+              onChange={(e) => setNewIssueTitle(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleCreateIssue()}
+            />
+            <button onClick={handleCreateIssue} disabled={!newIssueTitle || !ghToken}>
+              Create Issue (Jules)
+            </button>
+          </div>
+        </div>
+
         {loading && <p className="status-message">Loading issues...</p>}
         {error && <p className="status-message error">Error: {error}</p>}
 
