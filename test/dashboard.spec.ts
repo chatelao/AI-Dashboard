@@ -5,6 +5,9 @@ test('has title', async ({ page }) => {
 
   // Expect a title "to contain" a substring.
   await expect(page).toHaveTitle(/AI Development Dashboard/);
+
+  // Expect the description text to NOT be present.
+  await expect(page.locator('text=Unified view of GitHub Issues and Google Jules Statuses')).not.toBeVisible();
 });
 
 test('dashboard loads issues and displays Jules status', async ({ page }) => {
