@@ -1,8 +1,37 @@
 import { test, expect } from '@playwright/test';
 
 test.describe('Dashboard Consolidation', () => {
+  test.beforeEach(async ({ page }) => {
+    // Default mock for AI-Dashboard
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 1,
+            number: 101,
+            title: 'Fix a bug',
+            state: 'open',
+            html_url: 'https://github.com/chatelao/AI-Dashboard/issues/101',
+            body: 'Detailed description',
+            assignee: null
+          }
+        ])
+      });
+    });
+
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([])
+      });
+    });
+  });
+
   test('should consolidate PRs into issues as subtitles', async ({ page }) => {
-    // Mock GitHub Issues API
+    // Override Mock GitHub Issues API for this test
     await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
       await route.fulfill({
         status: 200,
@@ -41,7 +70,7 @@ test.describe('Dashboard Consolidation', () => {
       });
     });
 
-    // Mock GitHub Pulls API
+    // Override Mock GitHub Pulls API for this test
     await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', async (route) => {
       await route.fulfill({
         status: 200,
@@ -94,5 +123,99 @@ test.describe('Dashboard Consolidation', () => {
     // Verify total number of rows (should be 2: Issue 101 and PR 103)
     const rows = page.locator('tbody tr');
     await expect(rows).toHaveCount(2);
+  });
+
+  test('should support repository management', async ({ page }) => {
+    // Mock for a new repository
+    await page.route('https://api.github.com/repos/another/repo/issues?state=all', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            id: 10,
+            number: 1,
+            title: 'Another Repo Issue',
+            state: 'open',
+            html_url: 'https://github.com/another/repo/issues/1',
+            body: 'Issue in another repo',
+            assignee: null
+          }
+        ])
+      });
+    });
+
+    await page.route('https://api.github.com/repos/another/repo/pulls?state=all', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: '[]' });
+    });
+
+    await page.goto('/');
+
+    // Initially should show AI-Dashboard
+    await expect(page.locator('h1')).toContainText('AI-Dashboard');
+    await expect(page.locator('tbody')).toContainText('Fix a bug');
+
+    // Add a new repository
+    await page.fill('input[placeholder="owner/repo"]', 'another/repo');
+    await page.click('button:has-text("Add Repository")');
+
+    // Should now show another/repo
+    await expect(page.locator('tbody')).toContainText('Another Repo Issue');
+    await expect(page.locator('select#repo-select')).toHaveValue('another/repo');
+    await expect(page.locator('tbody')).toContainText('[another/repo]');
+
+    // Switch back using dropdown
+    await page.selectOption('select#repo-select', 'chatelao/AI-Dashboard');
+    await expect(page.locator('tbody')).toContainText('Fix a bug');
+    await expect(page.locator('tbody')).toContainText('[chatelao/AI-Dashboard]');
+  });
+
+  test('should create a new Jules issue', async ({ page }) => {
+    let postData: any = null;
+
+    // Using a glob pattern to be more flexible with the URL
+    await page.route('**/repos/chatelao/AI-Dashboard/issues', async (route) => {
+      if (route.request().method() === 'POST') {
+        postData = route.request().postDataJSON();
+        await route.fulfill({
+          status: 201,
+          contentType: 'application/json',
+          body: JSON.stringify({
+            id: 201,
+            number: 201,
+            title: postData?.title || 'Unknown',
+            state: 'open',
+            html_url: `https://github.com/chatelao/AI-Dashboard/issues/201`,
+            body: '',
+            assignee: null,
+            labels: [{ name: 'Jules' }]
+          })
+        });
+      } else {
+        await route.continue();
+      }
+    });
+
+    // Mock window.location.reload
+    await page.addInitScript(() => {
+      (window as any).location.reload = () => {
+        console.log('Window reload mocked');
+      };
+    });
+
+    await page.goto('/');
+
+    await page.fill('input[placeholder="New issue title"]', 'Test Jules Issue');
+
+    // Wait for the request to be sent
+    const [request] = await Promise.all([
+      page.waitForRequest(req => req.url().includes('/repos/chatelao/AI-Dashboard/issues') && req.method() === 'POST'),
+      page.click('button:has-text("Create Jules Issue")')
+    ]);
+
+    postData = request.postDataJSON();
+    expect(postData).not.toBeNull();
+    expect(postData.title).toBe('Test Jules Issue');
+    expect(postData.labels).toContain('Jules');
   });
 });
