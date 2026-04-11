@@ -87,3 +87,31 @@ a:hover {
 .text-muted {
   color: #666;
 }
+
+.pr-indicator {
+  display: inline-flex;
+  align-items: center;
+  margin-left: 12px;
+  padding: 2px 6px;
+  background-color: #2b2b2b;
+  border: 1px solid #444;
+  border-radius: 4px;
+  font-size: 0.75rem;
+  color: #8957e5;
+  text-decoration: none;
+  transition: all 0.2s ease;
+}
+
+.pr-indicator:hover {
+  background-color: #383838;
+  border-color: #8957e5;
+  color: #a371f7;
+}
+
+.pr-indicator span[role="img"] {
+  margin-right: 4px;
+}
+
+.pr-number {
+  font-weight: 600;
+}

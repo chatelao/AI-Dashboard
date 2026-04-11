@@ -7,6 +7,11 @@ interface GitHubIssue {
   title: string;
   state: string;
   html_url: string;
+  body?: string | null;
+  pull_request?: {
+    url: string;
+    html_url: string;
+  };
   assignee: {
     login: string;
   } | null;
@@ -14,6 +19,10 @@ interface GitHubIssue {
 
 interface IssueWithJulesStatus extends GitHubIssue {
   julesStatus?: string;
+  linkedPR?: {
+    number: number;
+    html_url: string;
+  };
 }
 
 function App() {
@@ -35,15 +44,34 @@ function App() {
           throw new Error('Failed to fetch issues from GitHub');
         }
         const data: GitHubIssue[] = await response.json();
+        const rawIssues = data.filter(item => !item.pull_request);
+        const rawPRs = data.filter(item => !!item.pull_request);
 
-        const processedIssues = data.map(issue => {
-          if (issue.assignee?.login === 'Jules' && issue.state === 'open') {
-            return {
-              ...issue,
-              julesStatus: getJulesStatus(issue.id)
-            };
+        const issueToPRMap = new Map<number, { number: number; html_url: string }>();
+        rawPRs.forEach(pr => {
+          if (pr.body) {
+            // Support multiple GitHub keywords: Fixes, Fixed, Fix, Closes, Closed, Close, Resolves, Resolved, Resolve
+            const pattern = /(?:Fixes|Fixed|Fix|Closes|Closed|Close|Resolves|Resolved|Resolve)\s+#(\d+)/gi;
+            let match;
+            while ((match = pattern.exec(pr.body)) !== null) {
+              const issueNumber = parseInt(match[1], 10);
+              issueToPRMap.set(issueNumber, {
+                number: pr.number,
+                html_url: pr.html_url
+              });
+            }
           }
-          return issue;
+        });
+
+        const processedIssues = rawIssues.map(issue => {
+          const updatedIssue: IssueWithJulesStatus = { ...issue };
+          if (issue.assignee?.login === 'Jules' && issue.state === 'open') {
+            updatedIssue.julesStatus = getJulesStatus(issue.id);
+          }
+          if (issueToPRMap.has(issue.number)) {
+            updatedIssue.linkedPR = issueToPRMap.get(issue.number);
+          }
+          return updatedIssue;
         });
 
         setIssues(processedIssues);
@@ -88,6 +116,18 @@ function App() {
                       <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
                         {issue.title}
                       </a>
+                      {issue.linkedPR && (
+                        <a
+                          href={issue.linkedPR.html_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="pr-indicator"
+                          title={`Linked PR #${issue.linkedPR.number}`}
+                        >
+                          <span role="img" aria-label="PR">🔗</span>
+                          <span className="pr-number">#{issue.linkedPR.number}</span>
+                        </a>
+                      )}
                     </td>
                     <td>
                       <span className={`badge state-${issue.state}`}>
