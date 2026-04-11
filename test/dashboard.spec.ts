@@ -54,7 +54,7 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
   await expect(table).toBeVisible();
 
   // Verify Issue 101 status and repo name
-  const row101 = page.locator('tr', { has: page.locator('td').filter({ hasText: /^101$/ }) });
-  await expect(row101.locator('td').nth(1)).toContainText('[AI-Dashboard]');
-  await expect(row101.locator('td').nth(5)).toContainText('Coding');
+  const row101 = page.locator('tr', { hasText: 'Jules issue' });
+  await expect(row101.locator('td').nth(0)).toContainText('[AI-Dashboard]');
+  await expect(row101.locator('td').nth(3)).toContainText('Coding');
 });

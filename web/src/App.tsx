@@ -375,7 +375,7 @@ function App() {
                   <th>Title</th>
                   <th>State</th>
                   <th>PR</th>
-                  <th>Jules Status</th>
+                  <th>Jules</th>
                 </tr>
               </thead>
               <tbody>
@@ -449,7 +449,7 @@ function App() {
                         )}
                       </div>
                     </td>
-                    <td data-label="Jules Status">
+                    <td data-label="Jules">
                       <div className="jules-status-group">
                         {issue.julesStatus ? (
                           issue.julesUrl ? (
