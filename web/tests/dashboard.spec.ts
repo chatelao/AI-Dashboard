@@ -27,7 +27,7 @@ test.describe('Dashboard Consolidation', () => {
             body: 'Fixes #101',
             assignee: null,
             labels: [],
-            pull_request: { url: '...', html_url: '...' }
+            pull_request: { url: 'https://api.github.com/repos/chatelao/AI-Dashboard/pulls/102', html_url: '...' }
           },
           {
             id: 3,
@@ -38,21 +38,25 @@ test.describe('Dashboard Consolidation', () => {
             body: 'Just a PR',
             assignee: null,
             labels: [],
-            pull_request: { url: '...', html_url: '...' }
+            pull_request: { url: 'https://api.github.com/repos/chatelao/AI-Dashboard/pulls/103', html_url: '...' }
           }
         ])
       });
     });
 
-    // Mock GitHub Pulls API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', async (route) => {
+    // Mock individual PR detail fetches
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls/102', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([
-          { number: 102, head: { sha: 'sha102' } },
-          { number: 103, head: { sha: 'sha103' } }
-        ])
+        body: JSON.stringify({ number: 102, head: { sha: 'sha102' } })
+      });
+    });
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls/103', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ number: 103, head: { sha: 'sha103' } })
       });
     });
 
@@ -130,20 +134,18 @@ test.describe('Dashboard Consolidation', () => {
             body: 'Fixes #201',
             assignee: { login: 'Jules' },
             labels: [],
-            pull_request: { url: '...', html_url: '...' }
+            pull_request: { url: 'https://api.github.com/repos/chatelao/AI-Dashboard/pulls/202', html_url: '...' }
           }
         ])
       });
     });
 
-    // Mock GitHub Pulls API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', async (route) => {
+    // Mock individual PR detail fetch
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls/202', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify([
-          { number: 202, head: { sha: 'sha202' } }
-        ])
+        body: JSON.stringify({ number: 202, head: { sha: 'sha202' } })
       });
     });
 

@@ -297,8 +297,8 @@ function App() {
               <tbody>
                 {issues.map(issue => (
                   <tr key={issue.id}>
-                    <td>{issue.number}</td>
-                    <td>
+                    <td data-label="#">{issue.number}</td>
+                    <td data-label="Title">
                       <div className="title-container">
                         <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
                           [{issue.repository.full_name.split('/')[1]}] {issue.title}
@@ -312,12 +312,12 @@ function App() {
                         ))}
                       </div>
                     </td>
-                    <td>
+                    <td data-label="State">
                       <span className={`badge state-${issue.state}`}>
                         {issue.state}
                       </span>
                     </td>
-                    <td>
+                    <td data-label="Assignee">
                       {issue.assignee ? (
                         <span className="assignee-badge">
                           {issue.assignee.login}
@@ -326,7 +326,7 @@ function App() {
                         <span className="text-muted">-</span>
                       )}
                     </td>
-                    <td>
+                    <td data-label="PR">
                       <div className="pr-status-group">
                         {issue.prStatus && (
                           <div className="pr-status-container">
@@ -362,21 +362,21 @@ function App() {
                                 <path
                                   fillRule="evenodd"
                                   d="M7.177 3.03a.75.75 0 11-1.354-.645 2.75 2.75 0 015.162 1.377 2.25 2.25 0 01-.89 4.113 2.25 2.25 0 011.655 2.175v.25a2.25 2.25 0 11-4.5 0v-.25c0-.97.615-1.798 1.48-2.122a2.75 2.75 0 00-1.553-4.898zM9 10.25a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z"
-                                ></path>
-                              </svg>
-                              <span className={`pr-label pr-label-${pr.prStatus.color}`}>
-                                {pr.prStatus.label}
-                              </span>
-                            </div>
-                          )
-                        ))}
-                        {!issue.prStatus && (!issue.linkedPRs || issue.linkedPRs.length === 0) && (
-                          <span className="text-muted">-</span>
-                        )}
-                      </div>
-                    </td>
-                    <td>
-                      <div className="jules-status-group">
+                              ></path>
+                            </svg>
+                            <span className={`pr-label pr-label-${pr.prStatus.color}`}>
+                              {pr.prStatus.label}
+                            </span>
+                          </div>
+                        )
+                      ))}
+                      {!issue.prStatus && (!issue.linkedPRs || issue.linkedPRs.length === 0) && (
+                        <span className="text-muted">-</span>
+                      )}
+                    </div>
+                  </td>
+                  <td data-label="Jules Status">
+                    <div className="jules-status-group">
                         {issue.julesStatus ? (
                           <span className={`badge jules-status-${issue.julesStatus.toLowerCase()}`}>
                             {issue.julesStatus}
