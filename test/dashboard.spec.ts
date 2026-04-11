@@ -8,13 +8,14 @@ test('has title', async ({ page }) => {
 });
 
 test('dashboard loads issues and displays Jules status', async ({ page }) => {
-  // Set mock jules_token
+  // Set mock tokens
   await page.addInitScript(() => {
+    window.localStorage.setItem('github_token', 'mock-gh-token');
     window.localStorage.setItem('jules_token', 'mock-jules-token');
   });
 
-  // Mock GitHub Issues API
-  await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
+  // Mock GitHub Global Issues API
+  await page.route('**/issues?state=all&filter=all*', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -26,6 +27,7 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
           state: 'open',
           html_url: 'https://github.com/chatelao/AI-Dashboard/issues/101',
           body: 'Help me Jules',
+          repository: { full_name: 'chatelao/AI-Dashboard' },
           assignee: { login: 'Jules' },
           labels: []
         },
@@ -34,21 +36,13 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
           number: 102,
           title: 'Labeled issue',
           state: 'closed',
-          html_url: 'https://github.com/chatelao/AI-Dashboard/issues/102',
+          html_url: 'https://github.com/chatelao/other-repo/issues/102',
           body: 'I have a label',
+          repository: { full_name: 'chatelao/other-repo' },
           assignee: null,
           labels: [{ name: 'Jules' }]
         }
       ])
-    });
-  });
-
-  // Mock GitHub Pulls API
-  await page.route('**/repos/chatelao/AI-Dashboard/pulls?state=all*', async (route) => {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify([])
     });
   });
 
@@ -76,11 +70,13 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
   const table = page.locator('table');
   await expect(table).toBeVisible();
 
-  // Verify Issue 101 status
+  // Verify Issue 101 status and repo name
   const row101 = page.locator('tr', { has: page.locator('td').filter({ hasText: /^101$/ }) });
+  await expect(row101.locator('td').nth(1)).toContainText('[AI-Dashboard]');
   await expect(row101.locator('td').nth(5)).toContainText('Coding');
 
-  // Verify Issue 102 status (closed but labeled Jules)
+  // Verify Issue 102 status and repo name
   const row102 = page.locator('tr', { has: page.locator('td').filter({ hasText: /^102$/ }) });
+  await expect(row102.locator('td').nth(1)).toContainText('[other-repo]');
   await expect(row102.locator('td').nth(5)).toContainText('Completed');
 });
