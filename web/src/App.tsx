@@ -1,5 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import './App.css'
+
+const JULES_API_BASE_URL = 'https://jules.googleapis.com/v1';
+const JULES_TOKEN_KEY = 'jules_token';
 
 interface GitHubIssue {
   id: number;
@@ -30,16 +33,56 @@ function App() {
   const [issues, setIssues] = useState<IssueWithJulesStatus[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [julesToken, setJulesToken] = useState<string | null>(localStorage.getItem(JULES_TOKEN_KEY));
+  const [tempToken, setTempToken] = useState<string>('');
 
-  const getJulesStatus = (issueId: number) => {
-    const statuses = ["Researching", "Coding", "Testing", "Completed"];
-    // Deterministic mock status based on issue ID
-    return statuses[issueId % statuses.length];
-  };
+  const handleLogout = useCallback(() => {
+    setJulesToken(null);
+  }, []);
 
   useEffect(() => {
+    // Keep local storage in sync with state
+    if (julesToken) {
+      localStorage.setItem(JULES_TOKEN_KEY, julesToken);
+    } else {
+      localStorage.removeItem(JULES_TOKEN_KEY);
+    }
+  }, [julesToken]);
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (tempToken.trim()) {
+      setJulesToken(tempToken);
+      setTempToken('');
+    }
+  };
+
+  const fetchJulesStatus = useCallback(async (issueId: number, token: string): Promise<string | undefined> => {
+    try {
+      const response = await fetch(`${JULES_API_BASE_URL}/tasks/${issueId}/status`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        if (response.status === 401) {
+          handleLogout();
+        }
+        return undefined;
+      }
+      const data = await response.json();
+      return data.status;
+    } catch (err) {
+      console.error(`Failed to fetch Jules status for issue ${issueId}:`, err);
+      return undefined;
+    }
+  }, [handleLogout]);
+
+  useEffect(() => {
+    let ignore = false;
     const fetchIssues = async () => {
       try {
+        setLoading(true);
         const [issuesResponse, prsResponse] = await Promise.all([
           fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all'),
           fetch('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all')
@@ -56,8 +99,10 @@ function App() {
         const processedIssues = await Promise.all(issuesData.map(async (issue) => {
           const updatedIssue: IssueWithJulesStatus = { ...issue };
 
-          if (issue.assignee?.login === 'Jules' && issue.state === 'open') {
-            updatedIssue.julesStatus = getJulesStatus(issue.id);
+          if (issue.assignee?.login === 'Jules' && issue.state === 'open' && julesToken) {
+            const status = await fetchJulesStatus(issue.id, julesToken);
+            if (ignore) return updatedIssue;
+            updatedIssue.julesStatus = status;
           }
 
           if (issue.pull_request) {
@@ -99,22 +144,54 @@ function App() {
           return updatedIssue;
         }));
 
-        setIssues(processedIssues);
+        if (!ignore) {
+          setIssues(processedIssues);
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        if (!ignore) {
+          setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        }
       } finally {
-        setLoading(false);
+        if (!ignore) {
+          setLoading(false);
+        }
       }
     };
 
     fetchIssues();
-  }, []);
+    return () => {
+      ignore = true;
+    };
+  }, [julesToken, fetchJulesStatus]);
 
   return (
     <div className="dashboard">
       <header>
-        <h1>AI Development Dashboard</h1>
-        <p>Unified view of GitHub Issues and Google Jules Statuses</p>
+        <div className="header-content">
+          <div className="header-title">
+            <h1>AI Development Dashboard</h1>
+            <p>Unified view of GitHub Issues and Google Jules Statuses</p>
+          </div>
+          <div className="auth-section">
+            {julesToken ? (
+              <div className="user-info">
+                <span className="auth-status">Authenticated with Jules</span>
+                <button onClick={handleLogout} className="btn-secondary">Logout</button>
+              </div>
+            ) : (
+              <form onSubmit={handleLogin} className="login-form">
+                <input
+                  type="password"
+                  placeholder="Enter Jules API Token"
+                  value={tempToken}
+                  onChange={(e) => setTempToken(e.target.value)}
+                  className="input-token"
+                />
+                <button type="submit" className="btn-primary">Login</button>
+              </form>
+            )}
+          </div>
+        </div>
       </header>
 
       <main>
