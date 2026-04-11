@@ -8,6 +8,9 @@ interface GitHubIssue {
   state: string;
   html_url: string;
   body: string | null;
+  repository: {
+    full_name: string;
+  };
   assignee: {
     login: string;
   } | null;
@@ -95,18 +98,31 @@ function App() {
           // Future integration: headers['X-Jules-Token'] = julesToken;
         }
 
-        const [issuesResponse, prsResponse] = await Promise.all([
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', { headers }),
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', { headers })
-        ]);
-
-        if (!issuesResponse.ok || !prsResponse.ok) {
-          throw new Error('Failed to fetch data from GitHub');
+        let issuesData: GitHubIssue[] = [];
+        if (ghToken) {
+          // Fetch up to 3 pages (300 items) from global issues endpoint
+          for (let page = 1; page <= 3; page++) {
+            const response = await fetch(`https://api.github.com/issues?state=all&filter=all&per_page=100&page=${page}`, { headers });
+            if (!response.ok) {
+              if (page === 1) throw new Error('Failed to fetch data from GitHub');
+              break;
+            }
+            const data: GitHubIssue[] = await response.json();
+            if (data.length === 0) break;
+            issuesData = [...issuesData, ...data];
+            if (data.length < 100) break;
+          }
+        } else {
+          // Fallback to specific repo if no token
+          const response = await fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', { headers });
+          if (!response.ok) throw new Error('Failed to fetch data from GitHub');
+          const data: GitHubIssue[] = await response.json();
+          // Manually add repository info if missing
+          issuesData = data.map(item => ({
+            ...item,
+            repository: item.repository || { full_name: 'chatelao/AI-Dashboard' }
+          }));
         }
-
-        const issuesData: GitHubIssue[] = await issuesResponse.json();
-        const prsData: { number: number; head: { sha: string } }[] = await prsResponse.json();
-        const prMap = new Map(prsData.map((pr) => [pr.number, pr]));
 
         const processedItems = await Promise.all(issuesData.map(async (item) => {
           const updatedItem: IssueWithJulesStatus = { ...item };
@@ -119,11 +135,14 @@ function App() {
           }
 
           if (item.pull_request) {
-            const pr = prMap.get(item.number);
-            if (pr) {
-              try {
+            try {
+              // Fetch full PR details to get head.sha
+              const prResponse = await fetch(item.pull_request.url, { headers });
+              if (prResponse.ok) {
+                const prDetail = await prResponse.json();
+                const sha = prDetail.head.sha;
                 const checkRunsResponse = await fetch(
-                  `https://api.github.com/repos/chatelao/AI-Dashboard/commits/${pr.head.sha}/check-runs`,
+                  `https://api.github.com/repos/${item.repository.full_name}/commits/${sha}/check-runs`,
                   { headers }
                 );
                 if (checkRunsResponse.ok) {
@@ -151,9 +170,9 @@ function App() {
                     label: 'Create'
                   };
                 }
-              } catch (err) {
-                console.error(`Failed to fetch check runs for PR #${item.number}`, err);
               }
+            } catch (err) {
+              console.error(`Failed to fetch check runs for PR #${item.number}`, err);
             }
           }
 
@@ -167,23 +186,24 @@ function App() {
         const issuesOnly = processedItems.filter(item => !item.pull_request);
         const prsOnly = processedItems.filter(item => item.pull_request);
 
-        // Map issues by number for easy lookup
-        const issuesByNumber = new Map(issuesOnly.map(issue => [issue.number, issue]));
+        // Map issues by repo#number for easy lookup
+        const issuesByNumber = new Map(issuesOnly.map(issue => [`${issue.repository.full_name}#${issue.number}`, issue]));
 
-        // Link PRs to issues
+        // Link PRs to issues (within the same repo)
         prsOnly.forEach(pr => {
           if (pr.body) {
             const regex = /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi;
             let match;
             while ((match = regex.exec(pr.body)) !== null) {
               const issueNumber = parseInt(match[1], 10);
-              const issue = issuesByNumber.get(issueNumber);
+              const issueKey = `${pr.repository.full_name}#${issueNumber}`;
+              const issue = issuesByNumber.get(issueKey);
               if (issue) {
                 if (!issue.linkedPRs) {
                   issue.linkedPRs = [];
                 }
                 issue.linkedPRs.push(pr);
-                linkedPrNumbers.add(pr.number);
+                linkedPrNumbers.add(pr.id); // Use ID because number might not be unique across repos
               }
             }
           }
@@ -192,7 +212,7 @@ function App() {
         // Combine all issues and unlinked PRs
         issuesOnly.forEach(issue => finalIssues.push(issue));
         prsOnly.forEach(pr => {
-          if (!linkedPrNumbers.has(pr.number)) {
+          if (!linkedPrNumbers.has(pr.id)) {
             finalIssues.push(pr);
           }
         });
@@ -213,7 +233,7 @@ function App() {
       <header>
         <div className="header-content">
           <div>
-            <h1>AI-Dashboard: AI Development Dashboard</h1>
+            <h1>AI Development Dashboard</h1>
             <p>Unified view of GitHub Issues and Google Jules Statuses</p>
           </div>
           <button
@@ -281,7 +301,7 @@ function App() {
                     <td>
                       <div className="title-container">
                         <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
-                          [AI-Dashboard] {issue.title}
+                          [{issue.repository.full_name.split('/')[1]}] {issue.title}
                         </a>
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
                           <div key={pr.id} className="subtitle">
