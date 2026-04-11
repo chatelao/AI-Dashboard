@@ -91,6 +91,23 @@ a:hover {
   color: #666;
 }
 
+.subtitle {
+  font-size: 0.85rem;
+  margin-top: 4px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.subtitle a {
+  color: #8b949e;
+  text-decoration: none;
+}
+
+.subtitle a:hover {
+  text-decoration: underline;
+}
+
 .pr-status-container {
   display: flex;
   align-items: center;

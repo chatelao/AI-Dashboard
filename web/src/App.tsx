@@ -7,6 +7,7 @@ interface GitHubIssue {
   title: string;
   state: string;
   html_url: string;
+  body: string | null;
   assignee: {
     login: string;
   } | null;
@@ -21,9 +22,18 @@ interface PRStatus {
   label: string;
 }
 
+interface LinkedPR {
+  number: number;
+  title: string;
+  html_url: string;
+  state: string;
+  head: { sha: string };
+}
+
 interface IssueWithJulesStatus extends GitHubIssue {
   julesStatus?: string;
   prStatus?: PRStatus;
+  linkedPRs?: LinkedPR[];
 }
 
 function App() {
@@ -35,6 +45,17 @@ function App() {
     const statuses = ["Researching", "Coding", "Testing", "Completed"];
     // Deterministic mock status based on issue ID
     return statuses[issueId % statuses.length];
+  };
+
+  const parseLinkedIssues = (text: string | null): number[] => {
+    if (!text) return [];
+    const pattern = /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi;
+    const matches = [];
+    let match;
+    while ((match = pattern.exec(text)) !== null) {
+      matches.push(parseInt(match[1], 10));
+    }
+    return matches;
   };
 
   useEffect(() => {
@@ -50,49 +71,73 @@ function App() {
         }
 
         const issuesData: GitHubIssue[] = await issuesResponse.json();
-        const prsData: { number: number; head: { sha: string } }[] = await prsResponse.json();
+        const prsData: (LinkedPR & { body: string | null })[] = await prsResponse.json();
         const prMap = new Map(prsData.map((pr) => [pr.number, pr]));
+        const issueToPRsMap = new Map<number, LinkedPR[]>();
+        const linkedPRNumbers = new Set<number>();
 
-        const processedIssues = await Promise.all(issuesData.map(async (issue) => {
-          const updatedIssue: IssueWithJulesStatus = { ...issue };
+        prsData.forEach(pr => {
+          const linkedIssueNumbers = parseLinkedIssues(pr.body);
+          linkedIssueNumbers.forEach(issueNum => {
+            const currentPRs = issueToPRsMap.get(issueNum) || [];
+            currentPRs.push({
+              number: pr.number,
+              title: pr.title,
+              html_url: pr.html_url,
+              state: pr.state,
+              head: pr.head
+            });
+            issueToPRsMap.set(issueNum, currentPRs);
+            linkedPRNumbers.add(pr.number);
+          });
+        });
+
+        const filteredIssues = issuesData.filter(issue =>
+          !issue.pull_request || !linkedPRNumbers.has(issue.number)
+        );
+
+        const processedIssues = await Promise.all(filteredIssues.map(async (issue) => {
+          const updatedIssue: IssueWithJulesStatus = {
+            ...issue,
+            linkedPRs: issueToPRsMap.get(issue.number)
+          };
 
           if (issue.assignee?.login === 'Jules' && issue.state === 'open') {
             updatedIssue.julesStatus = getJulesStatus(issue.id);
           }
 
-          if (issue.pull_request) {
-            const pr = prMap.get(issue.number);
-            if (pr) {
-              try {
-                const checkRunsResponse = await fetch(`https://api.github.com/repos/chatelao/AI-Dashboard/commits/${pr.head.sha}/check-runs`);
-                if (checkRunsResponse.ok) {
-                  const checkRunsData = await checkRunsResponse.json();
-                  let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
+          const targetPR = issue.pull_request ? prMap.get(issue.number) : updatedIssue.linkedPRs?.[0];
 
-                  if (checkRunsData.total_count > 0) {
-                    const checkRuns = checkRunsData.check_runs;
-                    const someFailed = checkRuns.some((run: { conclusion: string }) =>
-                      ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
-                    );
-                    const someRunning = checkRuns.some((run: { status: string }) => run.status !== 'completed');
+          if (targetPR) {
+            try {
+              const checkRunsResponse = await fetch(`https://api.github.com/repos/chatelao/AI-Dashboard/commits/${targetPR.head.sha}/check-runs`);
+              if (checkRunsResponse.ok) {
+                const checkRunsData = await checkRunsResponse.json();
+                let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
 
-                    if (someFailed) {
-                      color = 'red';
-                    } else if (someRunning) {
-                      color = 'yellow';
-                    } else {
-                      color = 'green';
-                    }
+                if (checkRunsData.total_count > 0) {
+                  const checkRuns = checkRunsData.check_runs;
+                  const someFailed = checkRuns.some((run: { conclusion: string }) =>
+                    ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
+                  );
+                  const someRunning = checkRuns.some((run: { status: string }) => run.status !== 'completed');
+
+                  if (someFailed) {
+                    color = 'red';
+                  } else if (someRunning) {
+                    color = 'yellow';
+                  } else {
+                    color = 'green';
                   }
-
-                  updatedIssue.prStatus = {
-                    color,
-                    label: 'Create'
-                  };
                 }
-              } catch (err) {
-                console.error(`Failed to fetch check runs for PR #${issue.number}`, err);
+
+                updatedIssue.prStatus = {
+                  color,
+                  label: 'Create'
+                };
               }
+            } catch (err) {
+              console.error(`Failed to fetch check runs for PR #${targetPR.number}`, err);
             }
           }
 
@@ -129,7 +174,6 @@ function App() {
                   <th>#</th>
                   <th>Title</th>
                   <th>State</th>
-                  <th>Assignee</th>
                   <th>PR</th>
                   <th>Jules Status</th>
                 </tr>
@@ -139,9 +183,25 @@ function App() {
                   <tr key={issue.id}>
                     <td>{issue.number}</td>
                     <td>
-                      <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
-                        [AI-Dashboard] {issue.title}
-                      </a>
+                      <div>
+                        <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
+                          [AI-Dashboard] {issue.title}
+                        </a>
+                      </div>
+                      {issue.linkedPRs && issue.linkedPRs.length > 0 && (
+                        <div className="subtitle">
+                          {issue.linkedPRs.map(pr => (
+                            <a
+                              key={pr.number}
+                              href={pr.html_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                            >
+                              PR #{pr.number}: {pr.title}
+                            </a>
+                          ))}
+                        </div>
+                      )}
                     </td>
                     <td>
                       <span className={`badge state-${issue.state}`}>
