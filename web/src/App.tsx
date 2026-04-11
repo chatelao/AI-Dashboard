@@ -14,6 +14,10 @@ interface GitHubIssue {
     url: string;
     html_url: string;
   };
+  body?: string;
+  head?: {
+    sha: string;
+  };
 }
 
 interface PRStatus {
@@ -24,6 +28,11 @@ interface PRStatus {
 interface IssueWithJulesStatus extends GitHubIssue {
   julesStatus?: string;
   prStatus?: PRStatus;
+  linkedPR?: {
+    number: number;
+    title: string;
+    html_url: string;
+  };
 }
 
 function App() {
@@ -50,7 +59,7 @@ function App() {
         }
 
         const issuesData: GitHubIssue[] = await issuesResponse.json();
-        const prsData: { number: number; head: { sha: string } }[] = await prsResponse.json();
+        const prsData: GitHubIssue[] = await prsResponse.json();
         const prMap = new Map(prsData.map((pr) => [pr.number, pr]));
 
         const processedIssues = await Promise.all(issuesData.map(async (issue) => {
@@ -60,46 +69,71 @@ function App() {
             updatedIssue.julesStatus = getJulesStatus(issue.id);
           }
 
-          if (issue.pull_request) {
-            const pr = prMap.get(issue.number);
-            if (pr) {
-              try {
-                const checkRunsResponse = await fetch(`https://api.github.com/repos/chatelao/AI-Dashboard/commits/${pr.head.sha}/check-runs`);
-                if (checkRunsResponse.ok) {
-                  const checkRunsData = await checkRunsResponse.json();
-                  let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
+          const pr = prMap.get(issue.number);
+          if (issue.pull_request && pr?.head) {
+            try {
+              const checkRunsResponse = await fetch(`https://api.github.com/repos/chatelao/AI-Dashboard/commits/${pr.head.sha}/check-runs`);
+              if (checkRunsResponse.ok) {
+                const checkRunsData = await checkRunsResponse.json();
+                let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
 
-                  if (checkRunsData.total_count > 0) {
-                    const checkRuns = checkRunsData.check_runs;
-                    const someFailed = checkRuns.some((run: { conclusion: string }) =>
-                      ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
-                    );
-                    const someRunning = checkRuns.some((run: { status: string }) => run.status !== 'completed');
+                if (checkRunsData.total_count > 0) {
+                  const checkRuns = checkRunsData.check_runs;
+                  const someFailed = checkRuns.some((run: { conclusion: string }) =>
+                    ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
+                  );
+                  const someRunning = checkRuns.some((run: { status: string }) => run.status !== 'completed');
 
-                    if (someFailed) {
-                      color = 'red';
-                    } else if (someRunning) {
-                      color = 'yellow';
-                    } else {
-                      color = 'green';
-                    }
+                  if (someFailed) {
+                    color = 'red';
+                  } else if (someRunning) {
+                    color = 'yellow';
+                  } else {
+                    color = 'green';
                   }
-
-                  updatedIssue.prStatus = {
-                    color,
-                    label: 'Create'
-                  };
                 }
-              } catch (err) {
-                console.error(`Failed to fetch check runs for PR #${issue.number}`, err);
+
+                updatedIssue.prStatus = {
+                  color,
+                  label: 'Create'
+                };
               }
+            } catch (err) {
+              console.error(`Failed to fetch check runs for PR #${issue.number}`, err);
             }
           }
 
           return updatedIssue;
         }));
 
-        setIssues(processedIssues);
+        // Link PRs to Issues
+        const issuesByNumber = new Map(processedIssues.map(i => [i.number, i]));
+        const prsToHide = new Set<number>();
+
+        processedIssues.forEach(item => {
+          if (item.pull_request) {
+            const prInfo = prMap.get(item.number);
+            const body = prInfo?.body || item.body || '';
+            const match = body.match(/(?:Fixes|Closes|Resolves)\s+#(\d+)/i);
+
+            if (match) {
+              const targetNumber = parseInt(match[1]);
+              const targetIssue = issuesByNumber.get(targetNumber);
+              if (targetIssue) {
+                targetIssue.linkedPR = {
+                  number: item.number,
+                  title: item.title,
+                  html_url: item.html_url
+                };
+                // Use the PR's status for the issue
+                targetIssue.prStatus = item.prStatus;
+                prsToHide.add(item.number);
+              }
+            }
+          }
+        });
+
+        setIssues(processedIssues.filter(i => !prsToHide.has(i.number)));
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
@@ -129,7 +163,6 @@ function App() {
                   <th>#</th>
                   <th>Title</th>
                   <th>State</th>
-                  <th>Assignee</th>
                   <th>PR</th>
                   <th>Jules Status</th>
                 </tr>
@@ -139,9 +172,18 @@ function App() {
                   <tr key={issue.id}>
                     <td>{issue.number}</td>
                     <td>
-                      <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
-                        {issue.title}
-                      </a>
+                      <div className="title-container">
+                        <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
+                          {issue.title}
+                        </a>
+                        {issue.linkedPR && (
+                          <div className="subtitle">
+                            <a href={issue.linkedPR.html_url} target="_blank" rel="noopener noreferrer">
+                              PR #{issue.linkedPR.number}: {issue.linkedPR.title}
+                            </a>
+                          </div>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <span className={`badge state-${issue.state}`}>
