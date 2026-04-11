@@ -52,7 +52,7 @@ function App() {
     return saved ? JSON.parse(saved) : ['chatelao/AI-Dashboard'];
   });
   const [filterState, setFilterState] = useState<'all' | 'open'>(
-    (localStorage.getItem('filter_state') as 'all' | 'open') || 'all'
+    (localStorage.getItem('filter_state') as 'all' | 'open') || 'open'
   );
   const [pageSize, setPageSize] = useState<number>(
     parseInt(localStorage.getItem('page_size') || '50', 10)

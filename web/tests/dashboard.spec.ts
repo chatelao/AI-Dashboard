@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Dashboard Consolidation', () => {
   test('should consolidate PRs into issues as subtitles', async ({ page }) => {
     // Mock GitHub Issues API
-    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -92,7 +92,7 @@ test.describe('Dashboard Consolidation', () => {
     await page.goto('/');
 
     // Verify Issue 101 exists and has PR 102 as subtitle
-    const issueRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /^101$/ }) });
+    const issueRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /Fix a bug/ }) });
     await expect(issueRow).toContainText('Fix a bug');
     await expect(issueRow.locator('.title-container .subtitle')).toContainText('PR #102: A linked PR');
 
@@ -100,7 +100,7 @@ test.describe('Dashboard Consolidation', () => {
     await expect(issueRow.locator('.pr-icon-green')).toBeVisible();
 
     // Verify PR 103 exists as a separate row (since it's not linked)
-    const prRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /^103$/ }) });
+    const prRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /Unlinked PR/ }) });
     await expect(prRow).toContainText('Unlinked PR');
 
     // Verify total number of rows (should be 2: Issue 101 and PR 103)
@@ -115,7 +115,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Issues API
-    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -194,10 +194,10 @@ test.describe('Dashboard Consolidation', () => {
 
     await page.goto('/');
 
-    const issueRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /^201$/ }) });
+    const issueRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /Jules issue/ }) });
 
     // Verify Issue 201 status and link
-    const julesStatusCell = issueRow.locator('td').nth(5);
+    const julesStatusCell = issueRow.locator('td').nth(3);
     await expect(julesStatusCell).toContainText('Coding');
     const issueLink = julesStatusCell.locator('a').first();
     await expect(issueLink).toHaveAttribute('href', 'https://jules.google.com/task/201');
@@ -216,7 +216,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Issues API
-    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -247,10 +247,10 @@ test.describe('Dashboard Consolidation', () => {
 
     await page.goto('/');
 
-    const issueRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /^301$/ }) });
+    const issueRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /Lowercase Jules label/ }) });
 
     // Verify Issue 301 status
-    await expect(issueRow.locator('td').nth(5)).toContainText('Testing');
+    await expect(issueRow.locator('td').nth(3)).toContainText('Testing');
   });
 
   test('should display Jules status for items assigned to google-labs-jules[bot]', async ({ page }) => {
@@ -260,7 +260,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Issues API
-    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -291,9 +291,9 @@ test.describe('Dashboard Consolidation', () => {
 
     await page.goto('/');
 
-    const issueRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /^401$/ }) });
+    const issueRow = page.locator('tr', { has: page.locator('td').filter({ hasText: /Jules bot issue/ }) });
 
     // Verify Issue 401 status
-    await expect(issueRow.locator('td').nth(5)).toContainText('Completed');
+    await expect(issueRow.locator('td').nth(3)).toContainText('Completed');
   });
 });
