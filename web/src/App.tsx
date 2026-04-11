@@ -38,6 +38,24 @@ function App() {
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
+  const [repos, setRepos] = useState<string[]>(() => {
+    const saved = localStorage.getItem('recent_repos');
+    return saved ? JSON.parse(saved) : ['chatelao/AI-Dashboard'];
+  });
+  const [currentRepo, setCurrentRepo] = useState<string>(() => {
+    return localStorage.getItem('current_repo') || repos[0];
+  });
+  const [newIssueTitle, setNewIssueTitle] = useState<string>('');
+  const [newRepo, setNewRepo] = useState<string>('');
+
+  useEffect(() => {
+    localStorage.setItem('recent_repos', JSON.stringify(repos));
+  }, [repos]);
+
+  useEffect(() => {
+    localStorage.setItem('current_repo', currentRepo);
+  }, [currentRepo]);
+
   const getJulesStatus = (issueId: number) => {
     const statuses = ["Researching", "Coding", "Testing", "Completed"];
     // Deterministic mock status based on issue ID
@@ -62,6 +80,43 @@ function App() {
     setShowSettings(false);
   };
 
+  const handleAddRepo = () => {
+    if (newRepo && !repos.includes(newRepo)) {
+      setRepos([...repos, newRepo]);
+      setCurrentRepo(newRepo);
+      setNewRepo('');
+    }
+  };
+
+  const handleCreateIssue = async () => {
+    if (!newIssueTitle || !ghToken) return;
+
+    try {
+      const response = await fetch(`https://api.github.com/repos/${currentRepo}/issues`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${ghToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: newIssueTitle,
+          labels: ['Jules']
+        })
+      });
+
+      if (response.ok) {
+        setNewIssueTitle('');
+        // Refresh issues
+        window.location.reload();
+      } else {
+        const errorData = await response.json();
+        setError(`Failed to create issue: ${errorData.message}`);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An unknown error occurred while creating the issue');
+    }
+  };
+
   useEffect(() => {
     const fetchIssues = async () => {
       try {
@@ -76,8 +131,8 @@ function App() {
         }
 
         const [issuesResponse, prsResponse] = await Promise.all([
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', { headers }),
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', { headers })
+          fetch(`https://api.github.com/repos/${currentRepo}/issues?state=all`, { headers }),
+          fetch(`https://api.github.com/repos/${currentRepo}/pulls?state=all`, { headers })
         ]);
 
         if (!issuesResponse.ok || !prsResponse.ok) {
@@ -100,7 +155,7 @@ function App() {
             if (pr) {
               try {
                 const checkRunsResponse = await fetch(
-                  `https://api.github.com/repos/chatelao/AI-Dashboard/commits/${pr.head.sha}/check-runs`,
+                  `https://api.github.com/repos/${currentRepo}/commits/${pr.head.sha}/check-runs`,
                   { headers }
                 );
                 if (checkRunsResponse.ok) {
@@ -146,7 +201,7 @@ function App() {
     };
 
     fetchIssues();
-  }, [ghToken, julesToken]);
+  }, [ghToken, julesToken, currentRepo]);
 
   return (
     <div className="dashboard">
@@ -163,6 +218,47 @@ function App() {
           >
             ⚙️
           </button>
+        </div>
+
+        <div className="controls-section">
+          <div className="repo-select-group">
+            <label htmlFor="repo-select">Repository:</label>
+            <select
+              id="repo-select"
+              value={currentRepo}
+              onChange={(e) => setCurrentRepo(e.target.value)}
+            >
+              {repos.map(repo => (
+                <option key={repo} value={repo}>{repo}</option>
+              ))}
+            </select>
+            <div className="add-repo-input">
+              <input
+                type="text"
+                placeholder="owner/repo"
+                value={newRepo}
+                onChange={(e) => setNewRepo(e.target.value)}
+              />
+              <button onClick={handleAddRepo}>Add</button>
+            </div>
+          </div>
+
+          <div className="issue-create-group">
+            <input
+              type="text"
+              placeholder="New issue title..."
+              value={newIssueTitle}
+              onChange={(e) => setNewIssueTitle(e.target.value)}
+              disabled={!ghToken}
+            />
+            <button
+              onClick={handleCreateIssue}
+              disabled={!ghToken || !newIssueTitle}
+              title={!ghToken ? 'GitHub token required' : ''}
+            >
+              Create Issue (Jules)
+            </button>
+          </div>
         </div>
       </header>
 
@@ -220,7 +316,7 @@ function App() {
                     <td>{issue.number}</td>
                     <td>
                       <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
-                        [AI-Dashboard] {issue.title}
+                        [{currentRepo.split('/').pop()}] {issue.title}
                       </a>
                     </td>
                     <td>
