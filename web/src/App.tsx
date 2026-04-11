@@ -37,6 +37,8 @@ function App() {
   const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'open'>('all');
+  const [pageSize, setPageSize] = useState<number>(10);
 
   const getJulesStatus = (issueId: number) => {
     const statuses = ["Researching", "Coding", "Testing", "Completed"];
@@ -75,20 +77,30 @@ function App() {
           // Future integration: headers['X-Jules-Token'] = julesToken;
         }
 
-        const [issuesResponse, prsResponse] = await Promise.all([
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', { headers }),
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', { headers })
+        // Fetch multiple pages to support up to 250 entries
+        const fetchAllPages = async (url: string) => {
+          let results: unknown[] = [];
+          for (let page = 1; page <= 3; page++) {
+            const response = await fetch(`${url}&per_page=100&page=${page}`, { headers });
+            if (!response.ok) break;
+            const data = await response.json() as unknown[];
+            if (!Array.isArray(data) || data.length === 0) break;
+            results = [...results, ...data];
+            if (data.length < 100) break;
+          }
+          return results;
+        };
+
+        const [issuesDataRaw, prsDataRaw] = await Promise.all([
+          fetchAllPages('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all'),
+          fetchAllPages('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all')
         ]);
 
-        if (!issuesResponse.ok || !prsResponse.ok) {
-          throw new Error('Failed to fetch data from GitHub');
-        }
-
-        const issuesData: GitHubIssue[] = await issuesResponse.json();
-        const prsData: { number: number; head: { sha: string } }[] = await prsResponse.json();
+        const issuesData = issuesDataRaw as GitHubIssue[];
+        const prsData = prsDataRaw as { number: number; head: { sha: string } }[];
         const prMap = new Map(prsData.map((pr) => [pr.number, pr]));
 
-        const processedIssues = await Promise.all(issuesData.map(async (issue) => {
+        const processedIssues = await Promise.all(issuesData.map(async (issue: GitHubIssue) => {
           const updatedIssue: IssueWithJulesStatus = { ...issue };
 
           if (issue.assignee?.login === 'Jules' && issue.state === 'open') {
@@ -202,8 +214,37 @@ function App() {
         {error && <p className="status-message error">Error: {error}</p>}
 
         {!loading && !error && (
-          <div className="table-container">
-            <table>
+          <>
+            <div className="controls-container">
+              <div className="control-group">
+                <label htmlFor="status-filter">Status:</label>
+                <select
+                  id="status-filter"
+                  value={statusFilter}
+                  onChange={(e) => setStatusFilter(e.target.value as 'all' | 'open')}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="open">Only Open</option>
+                </select>
+              </div>
+              <div className="control-group">
+                <label htmlFor="page-size">Show:</label>
+                <select
+                  id="page-size"
+                  value={pageSize}
+                  onChange={(e) => setPageSize(Number(e.target.value))}
+                >
+                  <option value="10">10 entries</option>
+                  <option value="20">20 entries</option>
+                  <option value="50">50 entries</option>
+                  <option value="100">100 entries</option>
+                  <option value="250">250 entries</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="table-container">
+              <table>
               <thead>
                 <tr>
                   <th>#</th>
@@ -215,7 +256,10 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {issues.map(issue => (
+                {issues
+                  .filter(issue => statusFilter === 'all' || issue.state === 'open')
+                  .slice(0, pageSize)
+                  .map(issue => (
                   <tr key={issue.id}>
                     <td>{issue.number}</td>
                     <td>
@@ -227,6 +271,13 @@ function App() {
                       <span className={`badge state-${issue.state}`}>
                         {issue.state}
                       </span>
+                    </td>
+                    <td>
+                      {issue.assignee ? (
+                        <span>{issue.assignee.login}</span>
+                      ) : (
+                        <span className="text-muted">-</span>
+                      )}
                     </td>
                     <td>
                       {issue.prStatus ? (
@@ -266,6 +317,7 @@ function App() {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </main>
     </div>
