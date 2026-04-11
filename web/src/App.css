@@ -254,6 +254,60 @@ a:hover {
   gap: 4px;
 }
 
+.controls-container {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 20px;
+  margin-bottom: 20px;
+  text-align: left;
+  flex-wrap: wrap;
+}
+
+.repo-controls, .issue-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.repo-controls select, .repo-controls input, .issue-controls input {
+  padding: 8px 12px;
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-family: inherit;
+}
+
+.add-repo {
+  display: flex;
+  gap: 8px;
+}
+
+.add-repo input {
+  flex: 1;
+}
+
+.controls-container button {
+  padding: 8px 16px;
+  background-color: #238636;
+  color: white;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+.controls-container button:hover {
+  background-color: #2ea043;
+}
+
+.controls-container button:disabled {
+  background-color: #161b22;
+  color: #484f58;
+  cursor: not-allowed;
+}
+
 @media (max-width: 768px) {
   #root {
     padding: 1rem;

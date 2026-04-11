@@ -39,6 +39,11 @@ function App() {
   const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [repos, setRepos] = useState<string[]>(JSON.parse(localStorage.getItem('gh_repos') || '["chatelao/AI-Dashboard"]'));
+  const [currentRepo, setCurrentRepo] = useState<string>(localStorage.getItem('current_gh_repo') || repos[0]);
+  const [newRepoInput, setNewRepoInput] = useState<string>('');
+  const [newIssueTitle, setNewIssueTitle] = useState<string>('');
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   const fetchJulesStatus = async (issueId: number, token: string): Promise<string | undefined> => {
     try {
@@ -79,6 +84,48 @@ function App() {
     setShowSettings(false);
   };
 
+  const handleAddRepo = () => {
+    if (!newRepoInput.trim() || !newRepoInput.includes('/')) return;
+    const updatedRepos = [...new Set([...repos, newRepoInput.trim()])];
+    setRepos(updatedRepos);
+    setCurrentRepo(newRepoInput.trim());
+    localStorage.setItem('gh_repos', JSON.stringify(updatedRepos));
+    localStorage.setItem('current_gh_repo', newRepoInput.trim());
+    setNewRepoInput('');
+  };
+
+  const handleRepoChange = (repo: string) => {
+    setCurrentRepo(repo);
+    localStorage.setItem('current_gh_repo', repo);
+  };
+
+  const handleCreateIssue = async () => {
+    if (!newIssueTitle.trim() || !ghToken) return;
+    try {
+      const response = await fetch(`https://api.github.com/repos/${currentRepo}/issues`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${ghToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: newIssueTitle.trim(),
+          labels: ['Jules']
+        })
+      });
+      if (response.ok) {
+        setNewIssueTitle('');
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        const data = await response.json();
+        alert(`Failed to create issue: ${data.message || response.statusText}`);
+      }
+    } catch (err) {
+      console.error('Failed to create issue:', err);
+      alert('An error occurred while creating the issue.');
+    }
+  };
+
   useEffect(() => {
     const fetchIssues = async () => {
       try {
@@ -93,8 +140,8 @@ function App() {
         }
 
         const [issuesResponse, prsResponse] = await Promise.all([
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', { headers }),
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', { headers })
+          fetch(`https://api.github.com/repos/${currentRepo}/issues?state=all`, { headers }),
+          fetch(`https://api.github.com/repos/${currentRepo}/pulls?state=all`, { headers })
         ]);
 
         if (!issuesResponse.ok || !prsResponse.ok) {
@@ -117,7 +164,7 @@ function App() {
             if (pr) {
               try {
                 const checkRunsResponse = await fetch(
-                  `https://api.github.com/repos/chatelao/AI-Dashboard/commits/${pr.head.sha}/check-runs`,
+                  `https://api.github.com/repos/${currentRepo}/commits/${pr.head.sha}/check-runs`,
                   { headers }
                 );
                 if (checkRunsResponse.ok) {
@@ -200,7 +247,7 @@ function App() {
     };
 
     fetchIssues();
-  }, [ghToken, julesToken]);
+  }, [ghToken, julesToken, currentRepo, refreshTrigger]);
 
   return (
     <div className="dashboard">
@@ -252,6 +299,44 @@ function App() {
       )}
 
       <main>
+        <div className="controls-container">
+          <div className="repo-controls">
+            <select
+              value={currentRepo}
+              onChange={(e) => handleRepoChange(e.target.value)}
+              aria-label="Select Repository"
+            >
+              {repos.map((repo) => (
+                <option key={repo} value={repo}>
+                  {repo}
+                </option>
+              ))}
+            </select>
+            <div className="add-repo">
+              <input
+                type="text"
+                value={newRepoInput}
+                onChange={(e) => setNewRepoInput(e.target.value)}
+                placeholder="owner/repo"
+                aria-label="Add new repository"
+              />
+              <button onClick={handleAddRepo}>Add Repo</button>
+            </div>
+          </div>
+          <div className="issue-controls">
+            <input
+              type="text"
+              value={newIssueTitle}
+              onChange={(e) => setNewIssueTitle(e.target.value)}
+              placeholder="New issue title"
+              aria-label="New issue title"
+            />
+            <button onClick={handleCreateIssue} disabled={!ghToken}>
+              Create Issue
+            </button>
+          </div>
+        </div>
+
         {loading && <p className="status-message">Loading issues...</p>}
         {error && <p className="status-message error">Error: {error}</p>}
 
@@ -275,7 +360,7 @@ function App() {
                     <td>
                       <div className="title-container">
                         <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
-                          [AI-Dashboard] {issue.title}
+                          [{currentRepo.split('/').pop()}] {issue.title}
                         </a>
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
                           <div key={pr.id} className="subtitle">

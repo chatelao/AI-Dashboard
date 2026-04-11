@@ -170,4 +170,90 @@ test.describe('Dashboard Consolidation', () => {
     // Verify Linked PR 202 status (as subtitle in Jules Status column)
     await expect(issueRow.locator('td').nth(5).locator('.subtitle')).toContainText('Researching');
   });
+
+  test('should allow adding and switching repositories', async ({ page }) => {
+    // Initial load for default repo
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+      await route.fulfill({ status: 200, body: JSON.stringify([]) });
+    });
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', async (route) => {
+      await route.fulfill({ status: 200, body: JSON.stringify([]) });
+    });
+
+    await page.goto('/');
+
+    // Add new repo
+    await page.route('https://api.github.com/repos/other-owner/other-repo/issues?state=all', async (route) => {
+      await route.fulfill({
+        status: 200,
+        body: JSON.stringify([{ id: 301, number: 301, title: 'Other Issue', state: 'open', html_url: '#', body: '', assignee: null }])
+      });
+    });
+    await page.route('https://api.github.com/repos/other-owner/other-repo/pulls?state=all', async (route) => {
+      await route.fulfill({ status: 200, body: JSON.stringify([]) });
+    });
+
+    await page.fill('input[aria-label="Add new repository"]', 'other-owner/other-repo');
+    await page.click('button:has-text("Add Repo")');
+
+    // Verify current repo is selected and data is loaded
+    await expect(page.locator('select[aria-label="Select Repository"]')).toHaveValue('other-owner/other-repo');
+    await expect(page.locator('tbody tr')).toContainText('Other Issue');
+    await expect(page.locator('tbody tr')).toContainText('[other-repo]');
+  });
+
+  test('should allow creating a new issue', async ({ page }) => {
+    await page.addInitScript(() => {
+      window.localStorage.setItem('github_token', 'mock-token');
+    });
+
+    let issueCreated = false;
+
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+      if (issueCreated) {
+        await route.fulfill({
+          status: 200,
+          contentType: 'application/json',
+          body: JSON.stringify([{
+            id: 401,
+            number: 401,
+            title: 'A new feature',
+            state: 'open',
+            html_url: 'https://github.com/chatelao/AI-Dashboard/issues/401',
+            body: '',
+            assignee: null
+          }])
+        });
+      } else {
+        await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+      }
+    });
+
+    await page.route('**/repos/chatelao/AI-Dashboard/pulls?state=all', async (route) => {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify([]) });
+    });
+
+    await page.goto('/');
+
+    // Mock issue creation
+    await page.route('**/repos/chatelao/AI-Dashboard/issues', async (route) => {
+      if (route.request().method() === 'POST') {
+        const postData = route.request().postDataJSON();
+        expect(postData.title).toBe('A new feature');
+        expect(postData.labels).toContain('Jules');
+        issueCreated = true;
+        await route.fulfill({ status: 201, contentType: 'application/json', body: JSON.stringify({ id: 401, number: 401 }) });
+      } else {
+        await route.continue();
+      }
+    });
+
+    await page.fill('input[aria-label="New issue title"]', 'A new feature');
+    await page.click('button:has-text("Create Issue")');
+
+    // Wait for the new issue to appear in the table
+    const newIssueRow = page.locator('tr', { hasText: '401' });
+    await expect(newIssueRow).toBeVisible();
+    await expect(newIssueRow).toContainText('A new feature');
+  });
 });
