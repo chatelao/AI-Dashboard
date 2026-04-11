@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Dashboard Consolidation', () => {
   test('should consolidate PRs into issues as subtitles', async ({ page }) => {
     // Mock GitHub Issues API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -42,7 +42,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Pulls API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', async (route) => {
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -94,5 +94,55 @@ test.describe('Dashboard Consolidation', () => {
     // Verify total number of rows (should be 2: Issue 101 and PR 103)
     const rows = page.locator('tbody tr');
     await expect(rows).toHaveCount(2);
+  });
+
+  test('should filter and paginate issues', async ({ page }) => {
+    const totalIssues = 30;
+    const mockIssues = Array.from({ length: totalIssues }, (_, i) => ({
+      id: i + 1,
+      number: 1000 + i,
+      title: `Issue ${i + 1}`,
+      state: i < 25 ? 'open' : 'closed',
+      html_url: `https://github.com/chatelao/AI-Dashboard/issues/${1000 + i}`,
+      body: 'Description',
+      assignee: null
+    }));
+
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify(mockIssues)
+      });
+    });
+
+    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([])
+      });
+    });
+
+    await page.goto('/');
+
+    // Verify default pagination (20 entries)
+    const rows = page.locator('tbody tr');
+    await expect(rows).toHaveCount(20);
+
+    // Change entries to 10
+    await page.selectOption('#page-size', '10');
+    await expect(rows).toHaveCount(10);
+
+    // Change status filter to "Only Open"
+    // With 30 issues total, 25 are open. If we show 50 entries, we should see 25.
+    // But we currently have 10 entries selected.
+    await page.selectOption('#page-size', '50');
+    await page.selectOption('#status-filter', 'open');
+    await expect(rows).toHaveCount(25);
+
+    // Verify all shown issues are open
+    const states = page.locator('.badge.state-open');
+    await expect(states).toHaveCount(25);
   });
 });

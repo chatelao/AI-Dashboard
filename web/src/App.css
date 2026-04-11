@@ -285,3 +285,44 @@ a:hover {
     font-size: 0.75rem;
   }
 }
+
+.controls-container {
+  display: flex;
+  justify-content: flex-start;
+  gap: 20px;
+  margin-bottom: 1.5rem;
+  padding: 0 0.5rem;
+}
+
+.control-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.control-group label {
+  font-size: 0.9rem;
+  color: #aaa;
+  font-weight: 500;
+}
+
+.control-group select {
+  padding: 6px 12px;
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-family: inherit;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.control-group select:focus {
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
+}
+
+.control-group select:hover {
+  border-color: #8b949e;
+}

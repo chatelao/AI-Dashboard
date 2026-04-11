@@ -39,6 +39,8 @@ function App() {
   const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [filterStatus, setFilterStatus] = useState<'all' | 'open'>('all');
+  const [pageSize, setPageSize] = useState<number>(20);
 
   const getJulesStatus = (issueId: number) => {
     const statuses = ["Researching", "Coding", "Testing", "Completed"];
@@ -77,17 +79,23 @@ function App() {
           // Future integration: headers['X-Jules-Token'] = julesToken;
         }
 
-        const [issuesResponse, prsResponse] = await Promise.all([
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', { headers }),
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', { headers })
-        ]);
+        const fetchAllPages = async (url: string) => {
+          let allData: unknown[] = [];
+          for (let page = 1; page <= 3; page++) {
+            const response = await fetch(`${url}&per_page=100&page=${page}`, { headers });
+            if (!response.ok) break;
+            const data = await response.json();
+            if (!Array.isArray(data) || data.length === 0) break;
+            allData = [...allData, ...data];
+            if (data.length < 100) break;
+          }
+          return allData;
+        };
 
-        if (!issuesResponse.ok || !prsResponse.ok) {
-          throw new Error('Failed to fetch data from GitHub');
-        }
-
-        const issuesData: GitHubIssue[] = await issuesResponse.json();
-        const prsData: { number: number; head: { sha: string } }[] = await prsResponse.json();
+        const [issuesData, prsData] = await Promise.all([
+          fetchAllPages('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all'),
+          fetchAllPages('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all')
+        ]) as [GitHubIssue[], { number: number; head: { sha: string } }[]];
         const prMap = new Map(prsData.map((pr) => [pr.number, pr]));
 
         const processedItems = await Promise.all(issuesData.map(async (item) => {
@@ -187,6 +195,15 @@ function App() {
     fetchIssues();
   }, [ghToken, julesToken]);
 
+  const filteredIssues = issues.filter(issue => {
+    if (filterStatus === 'open') {
+      return issue.state === 'open';
+    }
+    return true;
+  });
+
+  const paginatedIssues = filteredIssues.slice(0, pageSize);
+
   return (
     <div className="dashboard">
       <header>
@@ -241,7 +258,35 @@ function App() {
         {error && <p className="status-message error">Error: {error}</p>}
 
         {!loading && !error && (
-          <div className="table-container">
+          <>
+            <div className="controls-container">
+              <div className="control-group">
+                <label htmlFor="status-filter">Status:</label>
+                <select
+                  id="status-filter"
+                  value={filterStatus}
+                  onChange={(e) => setFilterStatus(e.target.value as 'all' | 'open')}
+                >
+                  <option value="all">All Statuses</option>
+                  <option value="open">Only Open</option>
+                </select>
+              </div>
+              <div className="control-group">
+                <label htmlFor="page-size">Entries:</label>
+                <select
+                  id="page-size"
+                  value={pageSize}
+                  onChange={(e) => setPageSize(parseInt(e.target.value, 10))}
+                >
+                  <option value="10">10</option>
+                  <option value="20">20</option>
+                  <option value="50">50</option>
+                  <option value="100">100</option>
+                  <option value="250">250</option>
+                </select>
+              </div>
+            </div>
+            <div className="table-container">
             <table>
               <thead>
                 <tr>
@@ -254,7 +299,7 @@ function App() {
                 </tr>
               </thead>
               <tbody>
-                {issues.map(issue => (
+                {paginatedIssues.map(issue => (
                   <tr key={issue.id}>
                     <td>{issue.number}</td>
                     <td>
@@ -348,6 +393,7 @@ function App() {
               </tbody>
             </table>
           </div>
+        </>
         )}
       </main>
     </div>
