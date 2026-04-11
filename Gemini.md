@@ -4,9 +4,11 @@
 This single-page application (SPA) is designed to provide a unified dashboard for tracking development progress. It aggregates data from GitHub and correlates it with task statuses from Google Jules.
 
 ## Hosting
-The application is hosted on **GitHub Pages**, providing a serverless and easily accessible deployment environment.
+- The application is hosted on **GitHub Pages**, providing a serverless and easily accessible deployment environment.
 
 ## Data Sources
+- `api-docs` : Document used APIs in this directory
+- Keep credentials caches per user in his browser for next sessions.
 
 ### GitHub API
 The SPA collects real-time data from specified GitHub repositories using the GitHub REST or GraphQL API.
@@ -25,3 +27,7 @@ For GitHub Issues that are currently **in progress** and **assigned to Jules**, 
 3. **Status Mapping:**
    - Retrieve the current operational status from Google Jules (e.g., "Researching", "Coding", "Testing", "Completed").
    - Display this Jules-specific status alongside the GitHub Issue in the SPA dashboard.
+
+## Testing
+- For all changes write / adapt a comprehensive set of playwright tests to ensure the system is stable.
+- Mock external interfaces
