@@ -74,12 +74,12 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
   await expect(table).toBeVisible();
 
   // Verify Issue 101 status and repo name
-  const row101 = page.locator('tr', { has: page.locator('td').filter({ hasText: /^101$/ }) });
-  await expect(row101.locator('td').nth(1)).toContainText('[AI-Dashboard]');
-  await expect(row101.locator('td').nth(5)).toContainText('Coding');
+  const row101 = page.locator('tr', { has: page.locator('td').filter({ hasText: /Jules issue/ }) });
+  await expect(row101.locator('td').nth(0)).toContainText('[AI-Dashboard]');
+  await expect(row101.locator('td').nth(3)).toContainText('Coding');
 
   // Verify Issue 102 status and repo name
-  const row102 = page.locator('tr', { has: page.locator('td').filter({ hasText: /^102$/ }) });
-  await expect(row102.locator('td').nth(1)).toContainText('[other-repo]');
-  await expect(row102.locator('td').nth(5)).toContainText('Completed');
+  const row102 = page.locator('tr', { has: page.locator('td').filter({ hasText: /Labeled issue/ }) });
+  await expect(row102.locator('td').nth(0)).toContainText('[other-repo]');
+  await expect(row102.locator('td').nth(3)).toContainText('Completed');
 });
