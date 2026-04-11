@@ -8,14 +8,37 @@ test('has title', async ({ page }) => {
 });
 
 test('dashboard loads issues', async ({ page }) => {
+  // Mock GitHub API to ensure consistency and avoid rate limits
+  await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([{
+        id: 1,
+        number: 1,
+        title: 'Mock Issue',
+        state: 'open',
+        html_url: 'https://github.com/chatelao/AI-Dashboard/issues/1',
+        body: '',
+        assignee: null
+      }])
+    });
+  });
+
+  await page.route('**/repos/chatelao/AI-Dashboard/pulls?state=all', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([])
+    });
+  });
+
   await page.goto('/');
 
-  // Wait for the table to be visible, or at least the header
+  // Wait for the table to be visible with an increased timeout
   const table = page.locator('table');
-  await expect(table).toBeVisible();
+  await expect(table).toBeVisible({ timeout: 10000 });
 
-  // Check if there are rows in the table (including header)
-  const rows = page.locator('tr');
-  const count = await rows.count();
-  expect(count).toBeGreaterThan(0);
+  // Verify that the table contains our mock issue
+  await expect(page.locator('tbody tr')).toContainText('Mock Issue');
 });

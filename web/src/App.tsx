@@ -39,8 +39,18 @@ function App() {
   const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [repos, setRepos] = useState<string[]>(JSON.parse(localStorage.getItem('gh_repos') || '["chatelao/AI-Dashboard"]'));
-  const [currentRepo, setCurrentRepo] = useState<string>(localStorage.getItem('current_gh_repo') || repos[0]);
+  const [repos, setRepos] = useState<string[]>(() => {
+    try {
+      const stored = localStorage.getItem('gh_repos');
+      return stored ? JSON.parse(stored) : ["chatelao/AI-Dashboard"];
+    } catch (e) {
+      console.error('Failed to parse gh_repos from localStorage', e);
+      return ["chatelao/AI-Dashboard"];
+    }
+  });
+  const [currentRepo, setCurrentRepo] = useState<string>(() => {
+    return localStorage.getItem('current_gh_repo') || repos[0] || "chatelao/AI-Dashboard";
+  });
   const [newRepoInput, setNewRepoInput] = useState<string>('');
   const [newIssueTitle, setNewIssueTitle] = useState<string>('');
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
