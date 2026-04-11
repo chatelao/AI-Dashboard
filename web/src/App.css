@@ -87,3 +87,28 @@ a:hover {
 .text-muted {
   color: #666;
 }
+
+.pr-status-container {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.pr-icon {
+  flex-shrink: 0;
+}
+
+.pr-icon-black { fill: #8b949e; }
+.pr-icon-green { fill: #3fb950; }
+.pr-icon-red { fill: #f85149; }
+.pr-icon-yellow { fill: #d29922; }
+
+.pr-label {
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+.pr-label-black { color: #8b949e; }
+.pr-label-green { color: #3fb950; }
+.pr-label-red { color: #f85149; }
+.pr-label-yellow { color: #d29922; }
