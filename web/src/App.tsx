@@ -233,8 +233,7 @@ function App() {
       <header>
         <div className="header-content">
           <div>
-            <h1>AI Development Dashboard</h1>
-            <p>Unified view of GitHub Issues and Google Jules Statuses</p>
+            <h1>AI-Dashboard</h1>
           </div>
           <button
             className="settings-toggle"
