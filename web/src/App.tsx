@@ -113,7 +113,7 @@ function App() {
   return (
     <div className="dashboard">
       <header>
-        <h1>AI Development Dashboard</h1>
+        <h1>AI-Dashboard: AI Development Dashboard</h1>
         <p>Unified view of GitHub Issues and Google Jules Statuses</p>
       </header>
 
@@ -140,7 +140,7 @@ function App() {
                     <td>{issue.number}</td>
                     <td>
                       <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
-                        {issue.title}
+                        [AI-Dashboard] {issue.title}
                       </a>
                     </td>
                     <td>
