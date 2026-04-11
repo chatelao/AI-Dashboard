@@ -3,7 +3,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Dashboard Consolidation', () => {
   test('should consolidate PRs into issues as subtitles', async ({ page }) => {
     // Mock GitHub Issues API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -115,7 +115,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Issues API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -216,7 +216,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Issues API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -260,7 +260,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock GitHub Issues API
-    await page.route('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', async (route) => {
+    await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

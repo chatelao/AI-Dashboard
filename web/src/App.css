@@ -16,8 +16,45 @@ header {
 .header-content {
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   text-align: left;
+  gap: 1rem;
+}
+
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.repo-selector select {
+  padding: 8px;
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.btn-new-issue {
+  padding: 8px 16px;
+  background-color: #238636;
+  color: white;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.btn-new-issue:hover:not(:disabled) {
+  background-color: #2ea043;
+}
+
+.btn-new-issue:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 .settings-toggle {
@@ -256,7 +293,18 @@ a:hover {
 
 @media (max-width: 768px) {
   #root {
-    padding: 1rem;
+    padding: 1rem 0.5rem;
+  }
+
+  .header-content {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.5rem;
+  }
+
+  .header-actions {
+    justify-content: space-between;
+    flex-wrap: wrap;
   }
 
   header {
@@ -264,12 +312,14 @@ a:hover {
   }
 
   h1 {
-    font-size: 1.5rem;
-    margin: 0.5rem 0;
+    font-size: 1.25rem;
+    line-height: 1.25rem;
+    margin: 0.25rem 0;
   }
 
   header p {
-    font-size: 0.9rem;
+    font-size: 0.8rem;
+    margin: 0.25rem 0;
   }
 
   .table-container {

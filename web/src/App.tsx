@@ -46,6 +46,10 @@ function App() {
   const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [currentRepo, setCurrentRepo] = useState<string>(localStorage.getItem('current_gh_repo') || 'chatelao/AI-Dashboard');
+  const [ghRepos, setGhRepos] = useState<string[]>(JSON.parse(localStorage.getItem('gh_repos') || '["chatelao/AI-Dashboard"]'));
+  const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+  const [isCreatingIssue, setIsCreatingIssue] = useState<boolean>(false);
 
   const fetchJulesStatus = async (issueId: number, token: string): Promise<{ status: string; url?: string } | undefined> => {
     try {
@@ -55,6 +59,7 @@ function App() {
         }
       });
       if (!response.ok) {
+        console.error(`Jules API error for issue ${issueId}: ${response.status} ${response.statusText}`);
         return undefined;
       }
       const data: unknown = await response.json();
@@ -85,15 +90,74 @@ function App() {
   const handleClearSettings = () => {
     localStorage.removeItem('github_token');
     localStorage.removeItem('jules_token');
+    localStorage.removeItem('current_gh_repo');
+    localStorage.removeItem('gh_repos');
     setGhToken('');
     setJulesToken('');
     setDraftGhToken('');
     setDraftJulesToken('');
+    setCurrentRepo('chatelao/AI-Dashboard');
+    setGhRepos(['chatelao/AI-Dashboard']);
     setShowSettings(false);
+  };
+
+  const handleAddRepo = (repo: string) => {
+    if (repo === 'ADD_NEW') {
+      const newRepo = prompt('Enter repository full name (e.g., owner/repo):');
+      if (newRepo) {
+        if (!ghRepos.includes(newRepo)) {
+          const newRepos = [...ghRepos, newRepo];
+          setGhRepos(newRepos);
+          localStorage.setItem('gh_repos', JSON.stringify(newRepos));
+        }
+        setCurrentRepo(newRepo);
+        localStorage.setItem('current_gh_repo', newRepo);
+      }
+      return;
+    }
+    setCurrentRepo(repo);
+    localStorage.setItem('current_gh_repo', repo);
+  };
+
+  const createNewIssue = async () => {
+    if (!ghToken) {
+      alert('Please set a GitHub token in settings to create issues.');
+      setShowSettings(true);
+      return;
+    }
+
+    setIsCreatingIssue(true);
+    try {
+      const response = await fetch(`https://api.github.com/repos/${currentRepo}/issues`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `token ${ghToken}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          title: `New task for Jules - ${new Date().toLocaleString()}`,
+          body: 'Automated task creation for Jules AI.',
+          labels: ['Jules']
+        })
+      });
+
+      if (response.ok) {
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        const data = await response.json();
+        alert(`Failed to create issue: ${data.message || response.statusText}`);
+      }
+    } catch (err) {
+      console.error('Error creating issue:', err);
+      alert('Error creating issue. See console for details.');
+    } finally {
+      setIsCreatingIssue(false);
+    }
   };
 
   useEffect(() => {
     const fetchIssues = async () => {
+      setLoading(true);
       try {
         const headers: HeadersInit = {};
         if (ghToken) {
@@ -102,33 +166,28 @@ function App() {
 
         if (julesToken) {
           console.log(`Using Jules API at ${JULES_API_BASE_URL}`);
-          // Future integration: headers['X-Jules-Token'] = julesToken;
         }
 
         let issuesData: GitHubIssue[] = [];
-        if (ghToken) {
-          // Fetch up to 3 pages (300 items) from global issues endpoint
-          for (let page = 1; page <= 3; page++) {
-            const response = await fetch(`https://api.github.com/issues?state=all&filter=all&per_page=100&page=${page}`, { headers });
-            if (!response.ok) {
-              if (page === 1) throw new Error('Failed to fetch data from GitHub');
-              break;
-            }
-            const data: GitHubIssue[] = await response.json();
-            if (data.length === 0) break;
-            issuesData = [...issuesData, ...data];
-            if (data.length < 100) break;
+        // Fetch up to 3 pages (300 items) from specific repo
+        for (let page = 1; page <= 3; page++) {
+          const url = `https://api.github.com/repos/${currentRepo}/issues?state=all&per_page=100&page=${page}`;
+          console.log(`Fetching: ${url}`);
+          const response = await fetch(url, { headers });
+          if (!response.ok) {
+            console.error(`GitHub API error for ${currentRepo} page ${page}: ${response.status} ${response.statusText}`);
+            if (page === 1) throw new Error(`Failed to fetch data for ${currentRepo}: ${response.statusText}`);
+            break;
           }
-        } else {
-          // Fallback to specific repo if no token
-          const response = await fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', { headers });
-          if (!response.ok) throw new Error('Failed to fetch data from GitHub');
           const data: GitHubIssue[] = await response.json();
+          if (data.length === 0) break;
           // Manually add repository info if missing
-          issuesData = data.map(item => ({
+          const withRepo = data.map(item => ({
             ...item,
-            repository: item.repository || { full_name: 'chatelao/AI-Dashboard' }
+            repository: item.repository || { full_name: currentRepo }
           }));
+          issuesData = [...issuesData, ...withRepo];
+          if (data.length < 100) break;
         }
 
         const processedItems = await Promise.all(issuesData.map(async (item) => {
@@ -240,7 +299,7 @@ function App() {
     };
 
     fetchIssues();
-  }, [ghToken, julesToken]);
+  }, [ghToken, julesToken, currentRepo, refreshTrigger]);
 
   return (
     <div className="dashboard">
@@ -250,13 +309,33 @@ function App() {
             <h1>AI Development Dashboard</h1>
             <p>Unified view of GitHub Issues and Google Jules Statuses</p>
           </div>
-          <button
-            className="settings-toggle"
-            onClick={() => setShowSettings(!showSettings)}
-            aria-label="Settings"
-          >
-            ⚙️
-          </button>
+          <div className="header-actions">
+            <div className="repo-selector">
+              <select
+                value={currentRepo}
+                onChange={(e) => handleAddRepo(e.target.value)}
+              >
+                {ghRepos.map(repo => (
+                  <option key={repo} value={repo}>{repo}</option>
+                ))}
+                <option value="ADD_NEW">+ Add Repository...</option>
+              </select>
+            </div>
+            <button
+              className="btn-new-issue"
+              onClick={createNewIssue}
+              disabled={isCreatingIssue}
+            >
+              {isCreatingIssue ? 'Creating...' : 'New Issue'}
+            </button>
+            <button
+              className="settings-toggle"
+              onClick={() => setShowSettings(!showSettings)}
+              aria-label="Settings"
+            >
+              ⚙️
+            </button>
+          </div>
         </div>
       </header>
 

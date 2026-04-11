@@ -15,7 +15,7 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
   });
 
   // Mock GitHub Global Issues API
-  await page.route('**/issues?state=all&filter=all*', async (route) => {
+  await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
