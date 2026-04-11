@@ -26,10 +26,17 @@ interface IssueWithJulesStatus extends GitHubIssue {
   prStatus?: PRStatus;
 }
 
+const JULES_API_BASE_URL = 'https://jules.googleapis.com/v1';
+
 function App() {
   const [issues, setIssues] = useState<IssueWithJulesStatus[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [ghToken, setGhToken] = useState<string>(localStorage.getItem('github_token') || '');
+  const [julesToken, setJulesToken] = useState<string>(localStorage.getItem('jules_token') || '');
+  const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
+  const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
+  const [showSettings, setShowSettings] = useState<boolean>(false);
 
   const getJulesStatus = (issueId: number) => {
     const statuses = ["Researching", "Coding", "Testing", "Completed"];
@@ -37,12 +44,40 @@ function App() {
     return statuses[issueId % statuses.length];
   };
 
+  const handleSaveSettings = () => {
+    localStorage.setItem('github_token', draftGhToken);
+    localStorage.setItem('jules_token', draftJulesToken);
+    setGhToken(draftGhToken);
+    setJulesToken(draftJulesToken);
+    setShowSettings(false);
+  };
+
+  const handleClearSettings = () => {
+    localStorage.removeItem('github_token');
+    localStorage.removeItem('jules_token');
+    setGhToken('');
+    setJulesToken('');
+    setDraftGhToken('');
+    setDraftJulesToken('');
+    setShowSettings(false);
+  };
+
   useEffect(() => {
     const fetchIssues = async () => {
       try {
+        const headers: HeadersInit = {};
+        if (ghToken) {
+          headers['Authorization'] = `token ${ghToken}`;
+        }
+
+        if (julesToken) {
+          console.log(`Using Jules API at ${JULES_API_BASE_URL}`);
+          // Future integration: headers['X-Jules-Token'] = julesToken;
+        }
+
         const [issuesResponse, prsResponse] = await Promise.all([
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all'),
-          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all')
+          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/issues?state=all', { headers }),
+          fetch('https://api.github.com/repos/chatelao/AI-Dashboard/pulls?state=all', { headers })
         ]);
 
         if (!issuesResponse.ok || !prsResponse.ok) {
@@ -64,7 +99,10 @@ function App() {
             const pr = prMap.get(issue.number);
             if (pr) {
               try {
-                const checkRunsResponse = await fetch(`https://api.github.com/repos/chatelao/AI-Dashboard/commits/${pr.head.sha}/check-runs`);
+                const checkRunsResponse = await fetch(
+                  `https://api.github.com/repos/chatelao/AI-Dashboard/commits/${pr.head.sha}/check-runs`,
+                  { headers }
+                );
                 if (checkRunsResponse.ok) {
                   const checkRunsData = await checkRunsResponse.json();
                   let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
@@ -108,14 +146,56 @@ function App() {
     };
 
     fetchIssues();
-  }, []);
+  }, [ghToken, julesToken]);
 
   return (
     <div className="dashboard">
       <header>
-        <h1>AI-Dashboard: AI Development Dashboard</h1>
-        <p>Unified view of GitHub Issues and Google Jules Statuses</p>
+        <div className="header-content">
+          <div>
+            <h1>AI-Dashboard: AI Development Dashboard</h1>
+            <p>Unified view of GitHub Issues and Google Jules Statuses</p>
+          </div>
+          <button
+            className="settings-toggle"
+            onClick={() => setShowSettings(!showSettings)}
+            aria-label="Settings"
+          >
+            ⚙️
+          </button>
+        </div>
       </header>
+
+      {showSettings && (
+        <section className="settings-panel">
+          <h2>Settings</h2>
+          <div className="settings-group">
+            <label htmlFor="gh-token">GitHub Personal Access Token:</label>
+            <input
+              id="gh-token"
+              type="password"
+              value={draftGhToken}
+              onChange={(e) => setDraftGhToken(e.target.value)}
+              placeholder="ghp_..."
+            />
+          </div>
+          <div className="settings-group">
+            <label htmlFor="jules-token">Jules API Token:</label>
+            <input
+              id="jules-token"
+              type="password"
+              value={draftJulesToken}
+              onChange={(e) => setDraftJulesToken(e.target.value)}
+              placeholder="Enter Jules token"
+            />
+          </div>
+          <div className="settings-actions">
+            <button className="btn-save" onClick={handleSaveSettings}>Save & Reload</button>
+            <button className="btn-clear" onClick={handleClearSettings}>Clear All</button>
+            <button className="btn-cancel" onClick={() => setShowSettings(false)}>Cancel</button>
+          </div>
+        </section>
+      )}
 
       <main>
         {loading && <p className="status-message">Loading issues...</p>}
