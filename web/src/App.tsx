@@ -157,11 +157,11 @@ function App() {
     setGhToken('');
     setJulesToken('');
     setJulesApiBase(DEFAULT_JULES_API_BASE);
-    setRepoHistory(['chatelao/AI-Dashboard']);
+    setRepoHistory([]);
     setDraftGhToken('');
     setDraftJulesToken('');
     setDraftJulesApiBase(DEFAULT_JULES_API_BASE);
-    setDraftRepoHistory('chatelao/AI-Dashboard');
+    setDraftRepoHistory('');
     setShowSettings(false);
     setRefreshTrigger(prev => prev + 1);
   };
@@ -177,14 +177,27 @@ function App() {
           headers['Authorization'] = `token ${ghToken}`;
         }
 
+        let effectiveRepoList = [...repoHistory];
+        if (effectiveRepoList.length === 0 && ghToken) {
+          try {
+            const response = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100', { headers });
+            if (response.ok) {
+              const repos: any[] = await response.json();
+              effectiveRepoList = repos.map(r => r.full_name);
+            }
+          } catch (err) {
+            console.error('Failed to fetch user repositories', err);
+          }
+        }
+
         const allReposResults = await Promise.all(
-          repoHistory.map(repo => fetchRawIssues(repo, filterState, headers))
+          effectiveRepoList.map(repo => fetchRawIssues(repo, filterState, headers))
         );
         const issuesData = allReposResults.flat();
 
         // Fetch PR metadata in bulk to get SHAs
         const prMetadataMap = new Map<string, string>();
-        await Promise.all(repoHistory.map(async (repo) => {
+        await Promise.all(effectiveRepoList.map(async (repo) => {
           try {
             const response = await fetch(`https://api.github.com/repos/${repo}/pulls?state=all&per_page=100`, { headers });
             if (response.ok) {
@@ -450,7 +463,7 @@ function App() {
               type="text"
               value={draftRepoHistory}
               onChange={(e) => setDraftRepoHistory(e.target.value)}
-              placeholder="owner/repo, owner2/repo2"
+              placeholder="owner/repo, owner2/repo2 (leave empty to track all your repos)"
             />
           </div>
           <div className="settings-actions">
