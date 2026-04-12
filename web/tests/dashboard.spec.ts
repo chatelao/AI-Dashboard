@@ -168,26 +168,54 @@ test.describe('Dashboard Consolidation', () => {
       });
     });
 
-    // Mock Jules API for Issue 201 (using 'url' field)
-    await page.route('**/v1/tasks/201/status', async (route) => {
+    // Mock GitHub Comments API for Issue 201
+    await page.route('**/repos/chatelao/AI-Dashboard/issues/201/comments*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            user: { login: 'google-labs-jules[bot]' },
+            body: 'Jules is on it. View progress at https://jules.google.com/session/201'
+          }
+        ])
+      });
+    });
+
+    // Mock GitHub Comments API for PR 202 (represented as issue comments in GitHub)
+    await page.route('**/repos/chatelao/AI-Dashboard/issues/202/comments*', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify([
+          {
+            user: { login: 'google-labs-jules[bot]' },
+            body: 'Jules is on it. View progress at https://jules.google.com/session/202'
+          }
+        ])
+      });
+    });
+
+    // Mock Jules API for Session 201
+    await page.route('**/v1alpha/session/201', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          status: 'Coding',
+          state: 'STATE_CODING',
           url: 'https://jules.google.com/task/201'
         })
       });
     });
 
-    // Mock Jules API for PR 202 (using 'task_url' field)
-    await page.route('**/v1/tasks/202/status', async (route) => {
+    // Mock Jules API for Session 202
+    await page.route('**/v1alpha/session/202', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
         body: JSON.stringify({
-          status: 'Researching',
-          task_url: 'https://jules.google.com/task/202'
+          state: 'STATE_RESEARCHING',
+          url: 'https://jules.google.com/task/202'
         })
       });
     });
@@ -236,12 +264,26 @@ test.describe('Dashboard Consolidation', () => {
       });
     });
 
-    // Mock Jules API for Issue 301
-    await page.route('**/v1/tasks/301/status', async (route) => {
+    // Mock GitHub Comments API for Issue 301
+    await page.route('**/repos/chatelao/AI-Dashboard/issues/301/comments*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ status: 'Testing' })
+        body: JSON.stringify([
+          {
+            user: { login: 'jules' },
+            body: 'Jules is on it. task_id: 301'
+          }
+        ])
+      });
+    });
+
+    // Mock Jules API for Session 301
+    await page.route('**/v1alpha/session/301', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ state: 'STATE_TESTING' })
       });
     });
 
@@ -280,12 +322,26 @@ test.describe('Dashboard Consolidation', () => {
       });
     });
 
-    // Mock Jules API for Issue 401
-    await page.route('**/v1/tasks/401/status', async (route) => {
+    // Mock GitHub Comments API for Issue 401
+    await page.route('**/repos/chatelao/AI-Dashboard/issues/401/comments*', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ status: 'Completed' })
+        body: JSON.stringify([
+          {
+            user: { login: 'google-labs-jules[bot]' },
+            body: 'Jules is on it. 12345678901234567'
+          }
+        ])
+      });
+    });
+
+    // Mock Jules API for Session 12345678901234567
+    await page.route('**/v1alpha/session/12345678901234567', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ state: 'STATE_COMPLETED' })
       });
     });
 
