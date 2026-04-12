@@ -92,15 +92,33 @@ if (isset($_GET['url'])) {
 }
 
 // 3. Forward the request using cURL
+$headers = array_change_key_case(getallheaders_robust(), CASE_LOWER);
+
+// DIAGNOSTIC: Check for Authorization header if calling Jules API
+if (!isset($headers['authorization']) && strpos($targetUrl, 'https://jules.googleapis.com/') === 0) {
+    header("Access-Control-Allow-Origin: *");
+    header("Content-Type: application/json");
+    http_response_code(401);
+    echo json_encode([
+        "error" => "Missing Authorization header",
+        "message" => "The proxy did not receive an Authorization header. If you are using Apache, you may need to add 'SetEnvIf Authorization \"(.*)\" HTTP_AUTHORIZATION=$1' to your .htaccess file. See CORS_PROXY.md for details."
+    ]);
+    exit;
+}
+
 $ch = curl_init($targetUrl);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $_SERVER['REQUEST_METHOD']);
 
-// Forward headers (excluding Host)
-$headers = getallheaders_robust();
+// Forward headers (excluding Host and browser-specific headers that might cause issues)
 $curlHeaders = [];
+$excludedHeaders = ['host', 'origin', 'referer'];
 foreach ($headers as $key => $value) {
-    if (strtolower($key) !== 'host') {
+    if (!in_array($key, $excludedHeaders) && strpos($key, 'sec-') !== 0) {
+        // Use original case if possible, but $headers is now lowercase keys
+        // For standard headers, title-case is usually fine if we wanted to be fancy,
+        // but most APIs (including Google) handle lowercase headers fine (HTTP/2 requires it anyway).
         $curlHeaders[] = "$key: $value";
     }
 }
@@ -111,6 +129,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
 }
 
+// Capture response headers to forward Content-Type
+$responseContentType = 'application/json';
+curl_setopt($ch, CURLOPT_HEADERFUNCTION, function($curl, $header) use (&$responseContentType) {
+    $len = strlen($header);
+    $parts = explode(':', $header, 2);
+    if (count($parts) === 2 && strtolower(trim($parts[0])) === 'content-type') {
+        $responseContentType = trim($parts[1]);
+    }
+    return $len;
+});
+
 $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
@@ -119,7 +148,7 @@ curl_close($ch);
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: *");
-header("Content-Type: application/json");
+header("Content-Type: $responseContentType");
 http_response_code($httpCode);
 echo $response;
 ```
@@ -130,6 +159,33 @@ echo $response;
     - If your server doesn't support paths after `.php`, use the `?url=` format: `https://your-domain.com/proxy.php?url=`
     - Otherwise, you can use the path format: `https://your-domain.com/proxy.php/v1`
     - Click **Save & Reload**.
+
+### Troubleshooting the Authorization Header
+
+On many Apache and PHP-FPM installations, the `Authorization` header is stripped before it reaches your PHP script. If the proxy returns a `401 Missing Authorization header` error despite you having configured it in the dashboard, try the following:
+
+#### Apache (.htaccess)
+
+Create or update the `.htaccess` file in the same directory as your `proxy.php`:
+
+```apache
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+    RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]
+</IfModule>
+
+# Alternative if the above doesn't work:
+SetEnvIf Authorization "(.*)" HTTP_AUTHORIZATION=$1
+```
+
+#### Nginx (fastcgi_params)
+
+If you have access to the Nginx configuration, ensure the following line is present in your `location ~ \.php$` block:
+
+```nginx
+fastcgi_param HTTP_AUTHORIZATION $major_http_authorization;
+```
+(Or similar, depending on your Nginx/FPM version).
 
 ---
 

@@ -27,12 +27,15 @@ The application logs its progress:
 - `Jules API response data for issue {number}: {data}`
 
 **Common Error Indicators:**
-- **401 Unauthorized:** Your `jules_token` is invalid or expired.
+- **401 Unauthorized:**
+  - Your `jules_token` is invalid or expired.
+  - **OR** your CORS proxy is not receiving the `Authorization` header. Many web servers (like Apache) strip this header by default. See [CORS_PROXY.md](CORS_PROXY.md#troubleshooting-the-authorization-header) for how to fix this using `.htaccess`.
 - **404 Not Found:** This can happen for several reasons:
   - The Jules API does not have a task corresponding to that GitHub issue number.
   - The **Jules API Base URL** in Settings is incorrect. It **must** include the `/v1` suffix (e.g., `https://jules.googleapis.com/v1`).
-  - Your CORS proxy is misconfigured and is not forwarding the `Authorization` header correctly. See [CORS_PROXY.md](CORS_PROXY.md) for a robust proxy script.
+  - Your CORS proxy is misconfigured. See [CORS_PROXY.md](CORS_PROXY.md) for a robust proxy script.
 - **CORS Errors:** If you see "Access-Control-Allow-Origin" errors, the Jules API might not be configured to allow requests from your current domain (e.g., `localhost` or `github.io`). See [Resolving CORS Errors](#resolving-cors-errors) below.
+- **SyntaxError: Unexpected token '<', "<html>..." is not valid JSON:** This usually means your proxy returned an HTML error page (like a 404 or 500 page from your web host) instead of the JSON response from the Jules API. Check the Network tab in your browser's Developer Tools to see the actual content returned by the proxy.
 
 ## 4. Resolving CORS Errors
 When running the dashboard in a browser, you may need a CORS proxy to access the Jules API.
