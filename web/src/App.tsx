@@ -94,7 +94,7 @@ function App() {
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   const formatJulesStatus = (status: string) => {
-    return status === 'in-progress' ? 'InProgress' : status.replace(/-/g, ' ');
+    return status === 'IN_PROGRESS' ? 'InProgress' : status.replace(/_/g, ' ');
   };
 
   const fetchRawIssues = async (repo: string, filterState: string, headers: HeadersInit): Promise<GitHubIssue[]> => {
