@@ -56,10 +56,10 @@ function App() {
     const saved = localStorage.getItem('gh_repos');
     return saved ? JSON.parse(saved) : ['chatelao/AI-Dashboard'];
   });
-  const [filterState, setFilterState] = useState<'all' | 'open'>(
+  const [filterState] = useState<'all' | 'open'>(
     (localStorage.getItem('filter_state') as 'all' | 'open') || 'all'
   );
-  const [pageSize, setPageSize] = useState<number>(
+  const [pageSize] = useState<number>(
     parseInt(localStorage.getItem('page_size') || '50', 10)
   );
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
@@ -368,16 +368,6 @@ function App() {
     };
   }, [ghToken, julesToken, filterState, refreshTrigger, pageSize, repoHistory]);
 
-  const handleFilterChange = (state: 'all' | 'open') => {
-    setFilterState(state);
-    localStorage.setItem('filter_state', state);
-  };
-
-  const handlePageSizeChange = (size: number) => {
-    setPageSize(size);
-    localStorage.setItem('page_size', size.toString());
-  };
-
   return (
     <div className="dashboard">
       <header>
@@ -386,6 +376,9 @@ function App() {
             <h1>AI Development Dashboard</h1>
           </div>
           <div className="header-actions">
+            <button className="btn-refresh" onClick={() => setRefreshTrigger(prev => prev + 1)}>
+              Refresh
+            </button>
             <button
               className="settings-toggle"
               onClick={() => setShowSettings(!showSettings)}
@@ -442,29 +435,6 @@ function App() {
       )}
 
       <main>
-        <div className="filters-bar">
-          <div className="filter-group">
-            <label>Filter:</label>
-            <select value={filterState} onChange={(e) => handleFilterChange(e.target.value as 'all' | 'open')}>
-              <option value="all">All Issues</option>
-              <option value="open">Open Only</option>
-            </select>
-          </div>
-          <div className="filter-group">
-            <label>Show:</label>
-            <select value={pageSize} onChange={(e) => handlePageSizeChange(parseInt(e.target.value, 10))}>
-              <option value="10">10</option>
-              <option value="20">20</option>
-              <option value="50">50</option>
-              <option value="100">100</option>
-              <option value="250">250</option>
-            </select>
-          </div>
-          <button className="btn-refresh" onClick={() => setRefreshTrigger(prev => prev + 1)}>
-            Refresh
-          </button>
-        </div>
-
         {loading && <p className="status-message">Loading issues...</p>}
         {error && <p className="status-message error">Error: {error}</p>}
 
