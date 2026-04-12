@@ -82,6 +82,64 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
   await expect(row101.locator('td').nth(3)).toContainText('coding');
 });
 
+test('dashboard displays InProgress for STATE_IN_PROGRESS', async ({ page }) => {
+  await page.addInitScript(() => {
+    window.localStorage.setItem('github_token', 'mock-gh-token');
+    window.localStorage.setItem('jules_token', 'mock-jules-token');
+    (window as any).isTest = true;
+  });
+
+  await page.route('**/repos/chatelao/AI-Dashboard/issues?state=all*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          id: 2,
+          number: 102,
+          title: 'In progress issue',
+          state: 'open',
+          html_url: 'https://github.com/chatelao/AI-Dashboard/issues/102',
+          repository: { full_name: 'chatelao/AI-Dashboard' },
+          assignee: { login: 'Jules' },
+          labels: [],
+          updated_at: '2023-10-01T12:00:00Z'
+        }
+      ])
+    });
+  });
+
+  await page.route('**/repos/chatelao/AI-Dashboard/issues/102/comments*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          user: { login: 'google-labs-jules[bot]' },
+          body: 'Jules is on it. View progress at https://jules.google.com/sessions/456'
+        }
+      ])
+    });
+  });
+
+  await page.route('**/v1alpha/sessions/456', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({
+        name: 'sessions/456',
+        state: 'STATE_IN_PROGRESS',
+        url: 'https://jules.google.com/sessions/456'
+      })
+    });
+  });
+
+  await page.goto('/');
+
+  const row102 = page.locator('tr', { has: page.locator('text=In progress issue') });
+  await expect(row102.locator('td').nth(3)).toContainText('InProgress');
+});
+
 test('dashboard aggregates issues from all repositories', async ({ page }) => {
   // Set mock tokens and repo history
   await page.addInitScript(() => {
