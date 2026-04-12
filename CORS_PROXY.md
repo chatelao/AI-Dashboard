@@ -98,14 +98,18 @@ if (isset($_GET['url'])) {
 // 3. Forward the request using cURL
 $headers = array_change_key_case(getallheaders_robust(), CASE_LOWER);
 
-// DIAGNOSTIC: Check for Authorization header if calling Jules API
-if (!isset($headers['authorization']) && !isset($headers['x-authorization']) && strpos($targetUrl, 'https://jules.googleapis.com/') === 0) {
+// DIAGNOSTIC: Check for authentication headers if calling Jules API
+$hasAuth = isset($headers['authorization']) ||
+           isset($headers['x-authorization']) ||
+           isset($headers['x-goog-api-key']);
+
+if (!$hasAuth && strpos($targetUrl, 'https://jules.googleapis.com/') === 0) {
     header("Access-Control-Allow-Origin: *");
     header("Content-Type: application/json");
     http_response_code(401);
     echo json_encode([
-        "error" => "Missing Authorization header",
-        "message" => "The proxy did not receive an Authorization or X-Authorization header. If you are using Apache, you may need to add 'SetEnvIf Authorization \"(.*)\" HTTP_AUTHORIZATION=$1' to your .htaccess file. See CORS_PROXY.md for details."
+        "error" => "Missing Authentication header",
+        "message" => "The proxy did not receive an Authorization, X-Authorization, or X-Goog-Api-Key header. If you are using Apache, you may need to add 'SetEnvIf Authorization \"(.*)\" HTTP_AUTHORIZATION=$1' to your .htaccess file. See CORS_PROXY.md for details."
     ]);
     exit;
 }
@@ -164,11 +168,11 @@ echo $response;
     - Otherwise, you can use the path format: `https://your-domain.com/proxy.php/v1`
     - Click **Save & Reload**.
 
-### Troubleshooting the Authorization Header
+### Troubleshooting Authentication Headers
 
-On many Apache and PHP-FPM installations, the `Authorization` header is stripped before it reaches your PHP script. The dashboard automatically sends an `X-Authorization` header as a fallback, which the provided proxy script is designed to handle.
+On many Apache and PHP-FPM installations, the `Authorization` header is stripped before it reaches your PHP script. The dashboard automatically sends an `X-Authorization` header as a fallback. The proxy script also supports the `X-Goog-Api-Key` header for Jules API authentication.
 
-If the proxy still returns a `401 Missing Authorization header` error despite you having configured it in the dashboard, try the following:
+If the proxy returns a `401 Missing Authentication header` error despite you having configured it correctly, try the following:
 
 #### Apache (.htaccess)
 
