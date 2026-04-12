@@ -187,10 +187,10 @@ function App() {
         const finalIssues: IssueWithJulesStatus[] = [];
         const linkedPrNumbers = new Set<number>();
 
-        const issuesOnly = issuesData.filter(item => !item.pull_request);
+        const issuesOnly = issuesData.filter(item => !item.pull_request) as IssueWithJulesStatus[];
         const prsOnly = issuesData.filter(item => item.pull_request);
 
-        const issuesByNumber = new Map(issuesOnly.map(issue => [`${issue.repository.full_name}#${issue.number}`, issue]));
+        const issuesByNumber = new Map<string, IssueWithJulesStatus>(issuesOnly.map(issue => [`${issue.repository.full_name}#${issue.number}`, issue]));
 
         prsOnly.forEach(pr => {
           if (pr.body) {
