@@ -42,7 +42,7 @@ interface IssueWithJulesStatus extends GitHubIssue {
   actionLoading?: boolean;
 }
 
-const DEFAULT_JULES_API_BASE = 'https://jules.googleapis.com/v1';
+const DEFAULT_JULES_API_BASE = 'https://jules.googleapis.com/v1alpha';
 
 function App() {
   const [issues, setIssues] = useState<IssueWithJulesStatus[]>([]);
@@ -109,11 +109,14 @@ function App() {
 
   const fetchJulesStatus = async (issueId: number, token: string): Promise<{ status: string; url?: string } | undefined> => {
     let url;
+    // v1alpha uses /sessions with a filter or direct session access.
+    // We'll search for sessions related to the issue.
+    // For now, we assume Jules API is queried for a session associated with the issue.
     if (julesApiBase.includes('?url=')) {
-      const targetUrl = `https://jules.googleapis.com/v1/tasks/${issueId}/status`;
+      const targetUrl = `https://jules.googleapis.com/v1alpha/sessions?filter=prompt%20:%20%22%23${issueId}%22`;
       url = `${julesApiBase}${encodeURIComponent(targetUrl)}`;
     } else {
-      url = `${julesApiBase}/tasks/${issueId}/status`;
+      url = `${julesApiBase}/sessions?filter=prompt%20:%20%22%23${issueId}%22`;
     }
     console.log(`Fetching Jules status from: ${url}`);
     try {
@@ -128,20 +131,22 @@ function App() {
       console.log(`Jules API response status for issue ${issueId}: ${response.status}`);
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn(`Jules API returned 404 for issue ${issueId}. Check your Jules API Base URL in Settings. It must end with /v1 (e.g., https://jules.googleapis.com/v1) and your proxy must forward the Authorization header.`);
+          console.warn(`Jules API returned 404 for issue ${issueId}. Check your Jules API Base URL in Settings. It must end with /v1alpha (e.g., https://jules.googleapis.com/v1alpha) and your proxy must forward the Authorization header.`);
         }
         return undefined;
       }
-      const data: unknown = await response.json();
+      const data: any = await response.json();
       console.log(`Jules API response data for issue ${issueId}:`, data);
-      if (data && typeof data === 'object' && 'status' in data && typeof data.status === 'string') {
-        const result: { status: string; url?: string } = { status: data.status };
-        if ('url' in data && typeof data.url === 'string') {
-          result.url = data.url;
-        } else if ('task_url' in data && typeof data.task_url === 'string') {
-          result.url = data.task_url;
+
+      // Look for the session in the list
+      if (data && data.sessions && Array.isArray(data.sessions) && data.sessions.length > 0) {
+        const session = data.sessions[0];
+        if (session.state) {
+          return {
+            status: session.state.replace('STATE_', '').replace(/_/g, ' ').toLowerCase(),
+            url: session.url
+          };
         }
-        return result;
       }
       return undefined;
     } catch (err) {
@@ -539,7 +544,7 @@ function App() {
               type="text"
               value={draftJulesApiBase}
               onChange={(e) => setDraftJulesApiBase(e.target.value)}
-              placeholder="https://jules.googleapis.com/v1"
+            placeholder="https://jules.googleapis.com/v1alpha"
             />
             <small className="help-text">
               Use this to configure a CORS proxy if needed. See <a href="https://github.com/chatelao/AI-Dashboard/blob/main/CORS_PROXY.md" target="_blank" rel="noopener noreferrer">CORS_PROXY.md</a> for instructions.
