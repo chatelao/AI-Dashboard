@@ -121,6 +121,9 @@ function App() {
       });
       console.log(`Jules API response status for issue ${issueId}: ${response.status}`);
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn(`Jules API returned 404 for issue ${issueId}. Check your Jules API Base URL in Settings. It must end with /v1 (e.g., https://jules.googleapis.com/v1) and your proxy must forward the Authorization header.`);
+        }
         return undefined;
       }
       const data: unknown = await response.json();

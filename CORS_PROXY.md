@@ -36,6 +36,22 @@ if (!function_exists('getallheaders')) {
     }
 }
 
+/**
+ * Get all headers, with extra robustness for the Authorization header
+ * which is often stripped by Apache/FastCGI.
+ */
+function getallheaders_robust() {
+    $headers = getallheaders();
+    if (!isset($headers['Authorization'])) {
+        if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
+            $headers['Authorization'] = $_SERVER['HTTP_AUTHORIZATION'];
+        } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
+            $headers['Authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+        }
+    }
+    return $headers;
+}
+
 // 1. Handle CORS Preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header("Access-Control-Allow-Origin: *");
@@ -81,7 +97,7 @@ curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $_SERVER['REQUEST_METHOD']);
 
 // Forward headers (excluding Host)
-$headers = getallheaders();
+$headers = getallheaders_robust();
 $curlHeaders = [];
 foreach ($headers as $key => $value) {
     if (strtolower($key) !== 'host') {
