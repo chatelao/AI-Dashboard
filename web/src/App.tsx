@@ -122,8 +122,8 @@ function App() {
 
   const extractSessionId = (text: string): string | undefined => {
     // Try to find common patterns for session/task IDs in Jules comments
-    // 1. Markdown links like [Jules Task](.../sessions/ID) or .../session/ID or .../task/ID
-    const urlRegex = /jules\.google\.com\/(?:session|sessions|task)\/([a-zA-Z0-9_-]+)/;
+    // 1. Markdown links like [Jules Task](.../sessions/ID) or .../task/ID
+    const urlRegex = /jules\.google\.com\/(?:sessions|task)\/([a-zA-Z0-9_-]+)/;
     const urlMatch = text.match(urlRegex);
     if (urlMatch) return urlMatch[1];
 
@@ -166,10 +166,10 @@ function App() {
     let url;
     // Use the exact session endpoint as requested
     if (julesApiBase.includes('?url=')) {
-      const targetUrl = `https://jules.googleapis.com/v1alpha/session/${sessionId}`;
+      const targetUrl = `https://jules.googleapis.com/v1alpha/sessions/${sessionId}`;
       url = `${julesApiBase}${encodeURIComponent(targetUrl)}`;
     } else {
-      url = `${julesApiBase}/session/${sessionId}`;
+      url = `${julesApiBase}/sessions/${sessionId}`;
     }
     console.log(`Fetching Jules status from: ${url}`);
     try {
@@ -189,7 +189,7 @@ function App() {
       console.log(`Jules API response status for session ${sessionId}: ${response.status}`);
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn(`Jules API returned 404 for session ${sessionId}. Check your Jules API Base URL in Settings. It must end with /v1alpha (e.g., https://jules.googleapis.com/v1alpha) and your proxy must forward the Authorization header.`);
+          console.warn(`Jules API returned 404 for session ${sessionId}. Check your Jules API Base URL in Settings. It must end with /v1alpha (e.g., https://jules.googleapis.com/v1alpha) and ensure you are using the plural /sessions/ endpoint.`);
         }
         return undefined;
       }

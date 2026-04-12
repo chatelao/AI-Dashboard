@@ -47,21 +47,21 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
       body: JSON.stringify([
         {
           user: { login: 'google-labs-jules[bot]' },
-          body: 'Jules is on it. View progress at https://jules.google.com/session/123'
+          body: 'Jules is on it. View progress at https://jules.google.com/sessions/123'
         }
       ])
     });
   });
 
   // Mock Jules API for Session 123
-  await page.route('**/v1alpha/session/123', async (route) => {
+  await page.route('**/v1alpha/sessions/123', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
         name: 'sessions/123',
         state: 'STATE_CODING',
-        url: 'https://jules.google.com/session/123'
+        url: 'https://jules.google.com/sessions/123'
       })
     });
   });
