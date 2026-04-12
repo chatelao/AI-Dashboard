@@ -21,8 +21,8 @@ For issues and pull requests identified as Jules tasks, the dashboard fetches th
 - **Identification:** An item is considered a Jules task if:
     - The assignee is `jules` or `google-labs-jules[bot]`.
     - It has a label named `Jules` (case-insensitive).
-- **Session ID Retrieval:** The application fetches GitHub issue comments and searches for the latest "Jules is on it" comment from the Jules bot. It extracts the session ID from Markdown links (e.g., `jules.google.com/session/ID`), explicit labels (`task_id: ID`), or long numeric patterns.
-- **Endpoint:** `https://jules.googleapis.com/v1alpha/session/${sessionId}`
+- **Session ID Retrieval:** The application fetches GitHub issue comments and searches for the latest "Jules is on it" comment from the Jules bot. It extracts the session ID from Markdown links (e.g., `jules.google.com/sessions/ID`), explicit labels (`task_id: ID`), or long numeric patterns.
+- **Endpoint:** `https://jules.googleapis.com/v1alpha/sessions/${sessionId}`
 - **Authentication:** Uses a Jules API Token stored in `localStorage` as `jules_token`. It is sent in the `Authorization` header using the `Bearer <TOKEN>` format.
 
 ## Data Processing

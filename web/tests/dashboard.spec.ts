@@ -176,7 +176,7 @@ test.describe('Dashboard Consolidation', () => {
         body: JSON.stringify([
           {
             user: { login: 'google-labs-jules[bot]' },
-            body: 'Jules is on it. View progress at https://jules.google.com/session/201'
+            body: 'Jules is on it. View progress at https://jules.google.com/sessions/201'
           }
         ])
       });
@@ -190,14 +190,14 @@ test.describe('Dashboard Consolidation', () => {
         body: JSON.stringify([
           {
             user: { login: 'google-labs-jules[bot]' },
-            body: 'Jules is on it. View progress at https://jules.google.com/session/202'
+            body: 'Jules is on it. View progress at https://jules.google.com/sessions/202'
           }
         ])
       });
     });
 
     // Mock Jules API for Session 201
-    await page.route('**/v1alpha/session/201', async (route) => {
+    await page.route('**/v1alpha/sessions/201', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -209,7 +209,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock Jules API for Session 202
-    await page.route('**/v1alpha/session/202', async (route) => {
+    await page.route('**/v1alpha/sessions/202', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -279,7 +279,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock Jules API for Session 301
-    await page.route('**/v1alpha/session/301', async (route) => {
+    await page.route('**/v1alpha/sessions/301', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
@@ -337,7 +337,7 @@ test.describe('Dashboard Consolidation', () => {
     });
 
     // Mock Jules API for Session 12345678901234567
-    await page.route('**/v1alpha/session/12345678901234567', async (route) => {
+    await page.route('**/v1alpha/sessions/12345678901234567', async (route) => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',

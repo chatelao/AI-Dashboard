@@ -82,7 +82,7 @@ if (strpos($targetUrl, '/v1alpha/sessions') !== false) {
             [
                 'name' => 'sessions/mock-' . $issueNumber,
                 'state' => 'STATE_CODING',
-                'url' => 'https://jules.google.com/session/mock-' . $issueNumber,
+                'url' => 'https://jules.google.com/sessions/mock-' . $issueNumber,
                 'prompt' => "Fix issue #$issueNumber",
                 'createTime' => date('c')
             ]

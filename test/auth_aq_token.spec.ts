@@ -52,7 +52,7 @@ test('uses X-Goog-Api-Key for AQ. tokens', async ({ page }) => {
 
   // Intercept and verify Jules API call
   let capturedHeaders: Record<string, string> = {};
-  await page.route('**/v1alpha/session/8999703094344754233', async (route) => {
+  await page.route('**/v1alpha/sessions/8999703094344754233', async (route) => {
     capturedHeaders = route.request().headers();
     await route.fulfill({
       status: 200,
@@ -124,7 +124,7 @@ test('uses Authorization for other tokens (e.g. ya29.)', async ({ page }) => {
 
   // Intercept and verify Jules API call
   let capturedHeaders: Record<string, string> = {};
-  await page.route('**/v1alpha/session/8999703094344754233', async (route) => {
+  await page.route('**/v1alpha/sessions/8999703094344754233', async (route) => {
     capturedHeaders = route.request().headers();
     await route.fulfill({
       status: 200,
