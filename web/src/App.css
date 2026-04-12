@@ -32,16 +32,6 @@ h1 {
   gap: 0.5rem;
 }
 
-.repo-selector input {
-  padding: 6px 12px;
-  background-color: #0d1117;
-  border: 1px solid #30363d;
-  border-radius: 6px;
-  color: #c9d1d9;
-  font-family: inherit;
-  width: 200px;
-}
-
 .settings-toggle {
   background: none;
   border: 1px solid #333;
@@ -342,15 +332,7 @@ a:hover {
 
   .header-actions {
     width: 100%;
-    justify-content: space-between;
-  }
-
-  .repo-selector {
-    flex-grow: 1;
-  }
-
-  .repo-selector input {
-    width: 100%;
+    justify-content: flex-end;
   }
 
   .filters-bar {

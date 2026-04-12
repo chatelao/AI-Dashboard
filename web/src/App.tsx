@@ -17,6 +17,7 @@ interface GitHubIssue {
   labels: {
     name: string;
   }[];
+  updated_at: string;
   pull_request?: {
     url: string;
     html_url: string;
@@ -49,8 +50,7 @@ function App() {
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [draftJulesApiBase, setDraftJulesApiBase] = useState<string>(julesApiBase);
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [currentRepo, setCurrentRepo] = useState<string>(localStorage.getItem('current_gh_repo') || 'chatelao/AI-Dashboard');
-  const [repoHistory, setRepoHistory] = useState<string[]>(() => {
+  const [repoHistory] = useState<string[]>(() => {
     const saved = localStorage.getItem('gh_repos');
     return saved ? JSON.parse(saved) : ['chatelao/AI-Dashboard'];
   });
@@ -61,6 +61,35 @@ function App() {
     parseInt(localStorage.getItem('page_size') || '50', 10)
   );
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
+
+  const fetchRawIssues = async (repo: string, filterState: string, headers: HeadersInit): Promise<GitHubIssue[]> => {
+    let issuesData: GitHubIssue[] = [];
+    // Sequential fetch up to 3 pages per repo to avoid hitting rate limits too fast
+    for (let page = 1; page <= 3; page++) {
+      const response = await fetch(
+        `https://api.github.com/repos/${repo}/issues?state=${filterState}&per_page=100&page=${page}`,
+        { headers }
+      );
+      if (!response.ok) {
+        if (page === 1) console.error(`Failed to fetch from ${repo}`);
+        break;
+      }
+      const data: unknown = await response.json();
+      if (Array.isArray(data)) {
+        const pageIssues = data as GitHubIssue[];
+        if (pageIssues.length === 0) break;
+        // Manually add repository info if missing from API response
+        issuesData = [...issuesData, ...pageIssues.map(item => ({
+          ...item,
+          repository: item.repository || { full_name: repo }
+        }))];
+        if (pageIssues.length < 100) break;
+      } else {
+        break;
+      }
+    }
+    return issuesData;
+  };
 
   const fetchJulesStatus = async (issueId: number, token: string): Promise<{ status: string; url?: string } | undefined> => {
     const url = `${julesApiBase}/tasks/${issueId}/status`;
@@ -128,112 +157,20 @@ function App() {
           headers['Authorization'] = `token ${ghToken}`;
         }
 
-        let issuesData: GitHubIssue[] = [];
-        // Sequential fetch up to 5 pages
-        for (let page = 1; page <= 5; page++) {
-          const response = await fetch(
-            `https://api.github.com/repos/${currentRepo}/issues?state=${filterState}&per_page=100&page=${page}`,
-            { headers }
-          );
-          if (!response.ok) {
-            if (page === 1) throw new Error(`Failed to fetch from ${currentRepo}`);
-            break;
-          }
-          const data: unknown = await response.json();
-          if (Array.isArray(data)) {
-            const pageIssues = data as GitHubIssue[];
-            if (pageIssues.length === 0) break;
-            // Manually add repository info if missing from API response (e.g. some repo endpoints)
-            issuesData = [...issuesData, ...pageIssues.map(item => ({
-              ...item,
-              repository: item.repository || { full_name: currentRepo }
-            }))];
-            if (pageIssues.length < 100) break;
-          } else {
-            break;
-          }
-        }
+        const allReposResults = await Promise.all(
+          repoHistory.map(repo => fetchRawIssues(repo, filterState, headers))
+        );
+        const issuesData = allReposResults.flat();
 
-        const processedItems = await Promise.all(issuesData.map(async (item) => {
-          const updatedItem: IssueWithJulesStatus = { ...item };
-
-          const isJules = (
-            item.assignee?.login?.toLowerCase() === 'jules' ||
-            item.assignee?.login?.toLowerCase() === 'google-labs-jules[bot]' ||
-            item.labels.some(l => l.name.toLowerCase() === 'jules')
-          );
-
-          if (isJules) {
-            updatedItem.isJules = true;
-            if (julesToken) {
-              const result = await fetchJulesStatus(item.number, julesToken);
-              if (result) {
-                updatedItem.julesStatus = result.status;
-                updatedItem.julesUrl = result.url;
-              }
-            } else {
-              console.log(`Issue #${item.number} is a Jules task but julesToken is missing.`);
-            }
-          }
-
-          if (item.pull_request) {
-            try {
-              // Fetch full PR details to get head.sha
-              const prResponse = await fetch(item.pull_request.url, { headers });
-              if (prResponse.ok) {
-                const prDetail: unknown = await prResponse.json();
-                if (prDetail && typeof prDetail === 'object' && 'head' in prDetail && prDetail.head && typeof prDetail.head === 'object' && 'sha' in prDetail.head) {
-                  const sha = (prDetail.head as { sha: string }).sha;
-                  const checkRunsResponse = await fetch(
-                    `https://api.github.com/repos/${item.repository.full_name}/commits/${sha}/check-runs`,
-                    { headers }
-                  );
-                  if (checkRunsResponse.ok) {
-                    const checkRunsData: unknown = await checkRunsResponse.json();
-                    let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
-
-                    if (checkRunsData && typeof checkRunsData === 'object' && 'total_count' in checkRunsData && typeof checkRunsData.total_count === 'number' && checkRunsData.total_count > 0 && 'check_runs' in checkRunsData && Array.isArray(checkRunsData.check_runs)) {
-                      const checkRuns = checkRunsData.check_runs as { status: string; conclusion: string }[];
-                      const someFailed = checkRuns.some(run =>
-                        ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
-                      );
-                      const someRunning = checkRuns.some(run => run.status !== 'completed');
-
-                      if (someFailed) {
-                        color = 'red';
-                      } else if (someRunning) {
-                        color = 'yellow';
-                      } else {
-                        color = 'green';
-                      }
-                    }
-
-                    updatedItem.prStatus = {
-                      color,
-                      label: 'Create'
-                    };
-                  }
-                }
-              }
-            } catch (err) {
-              console.error(`Failed to fetch check runs for PR #${item.number}`, err);
-            }
-          }
-
-          return updatedItem;
-        }));
-
+        // Consolidation and Sorting
         const finalIssues: IssueWithJulesStatus[] = [];
         const linkedPrNumbers = new Set<number>();
 
-        // First, separate issues and PRs
-        const issuesOnly = processedItems.filter(item => !item.pull_request);
-        const prsOnly = processedItems.filter(item => item.pull_request);
+        const issuesOnly = issuesData.filter(item => !item.pull_request);
+        const prsOnly = issuesData.filter(item => item.pull_request);
 
-        // Map issues by repo#number for easy lookup
         const issuesByNumber = new Map(issuesOnly.map(issue => [`${issue.repository.full_name}#${issue.number}`, issue]));
 
-        // Link PRs to issues (within the same repo)
         prsOnly.forEach(pr => {
           if (pr.body) {
             const regex = /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi;
@@ -246,22 +183,97 @@ function App() {
                 if (!issue.linkedPRs) {
                   issue.linkedPRs = [];
                 }
-                issue.linkedPRs.push(pr);
-                linkedPrNumbers.add(pr.id); // Use ID because number might not be unique across repos
+                issue.linkedPRs.push(pr as IssueWithJulesStatus);
+                linkedPrNumbers.add(pr.id);
               }
             }
           }
         });
 
-        // Combine all issues and unlinked PRs
-        issuesOnly.forEach(issue => finalIssues.push(issue));
+        issuesOnly.forEach(issue => finalIssues.push(issue as IssueWithJulesStatus));
         prsOnly.forEach(pr => {
           if (!linkedPrNumbers.has(pr.id)) {
-            finalIssues.push(pr);
+            finalIssues.push(pr as IssueWithJulesStatus);
           }
         });
 
-        setIssues(finalIssues);
+        // Sort by updated_at descending
+        finalIssues.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+        // Optimization: Slice BEFORE fetching statuses
+        const visibleIssues = finalIssues.slice(0, pageSize);
+
+        const processedItems = await Promise.all(visibleIssues.map(async (item) => {
+          const updatedItem: IssueWithJulesStatus = { ...item };
+
+          // Define a function to process a single item (issue or PR)
+          const processItem = async (target: IssueWithJulesStatus) => {
+            const isJules = (
+              target.assignee?.login?.toLowerCase() === 'jules' ||
+              target.assignee?.login?.toLowerCase() === 'google-labs-jules[bot]' ||
+              target.labels.some(l => l.name.toLowerCase() === 'jules')
+            );
+
+            if (isJules) {
+              target.isJules = true;
+              if (julesToken) {
+                const result = await fetchJulesStatus(target.number, julesToken);
+                if (result) {
+                  target.julesStatus = result.status;
+                  target.julesUrl = result.url;
+                }
+              }
+            }
+
+            if (target.pull_request) {
+              try {
+                const prResponse = await fetch(target.pull_request.url, { headers });
+                if (prResponse.ok) {
+                  const prDetail: any = await prResponse.json();
+                  if (prDetail?.head?.sha) {
+                    const sha = prDetail.head.sha;
+                    const checkRunsResponse = await fetch(
+                      `https://api.github.com/repos/${target.repository.full_name}/commits/${sha}/check-runs`,
+                      { headers }
+                    );
+                    if (checkRunsResponse.ok) {
+                      const checkRunsData: any = await checkRunsResponse.json();
+                      let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
+
+                      if (checkRunsData?.total_count > 0 && Array.isArray(checkRunsData.check_runs)) {
+                        const checkRuns = checkRunsData.check_runs;
+                        const someFailed = checkRuns.some((run: any) =>
+                          ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
+                        );
+                        const someRunning = checkRuns.some((run: any) => run.status !== 'completed');
+
+                        if (someFailed) color = 'red';
+                        else if (someRunning) color = 'yellow';
+                        else color = 'green';
+                      }
+
+                      target.prStatus = { color, label: 'Create' };
+                    }
+                  }
+                }
+              } catch (err) {
+                console.error(`Failed to fetch check runs for PR #${target.number}`, err);
+              }
+            }
+          };
+
+          // Process the main item
+          await processItem(updatedItem);
+
+          // Process linked PRs if they exist
+          if (updatedItem.linkedPRs) {
+            await Promise.all(updatedItem.linkedPRs.map(pr => processItem(pr)));
+          }
+
+          return updatedItem;
+        }));
+
+        setIssues(processedItems);
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
       } finally {
@@ -270,18 +282,7 @@ function App() {
     };
 
     fetchIssues();
-  }, [ghToken, julesToken, currentRepo, filterState, refreshTrigger]);
-
-  const handleRepoChange = (newRepo: string) => {
-    if (!newRepo) return;
-    setCurrentRepo(newRepo);
-    localStorage.setItem('current_gh_repo', newRepo);
-    if (!repoHistory.includes(newRepo)) {
-      const newHistory = [newRepo, ...repoHistory].slice(0, 10);
-      setRepoHistory(newHistory);
-      localStorage.setItem('gh_repos', JSON.stringify(newHistory));
-    }
-  };
+  }, [ghToken, julesToken, filterState, refreshTrigger, pageSize, repoHistory]);
 
   const handleFilterChange = (state: 'all' | 'open') => {
     setFilterState(state);
@@ -301,20 +302,6 @@ function App() {
             <h1>AI Development Dashboard</h1>
           </div>
           <div className="header-actions">
-            <div className="repo-selector">
-              <input
-                type="text"
-                list="repo-history"
-                value={currentRepo}
-                onChange={(e) => setCurrentRepo(e.target.value)}
-                onBlur={(e) => handleRepoChange(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleRepoChange((e.target as HTMLInputElement).value)}
-                placeholder="owner/repo"
-              />
-              <datalist id="repo-history">
-                {repoHistory.map(repo => <option key={repo} value={repo} />)}
-              </datalist>
-            </div>
             <button
               className="settings-toggle"
               onClick={() => setShowSettings(!showSettings)}
