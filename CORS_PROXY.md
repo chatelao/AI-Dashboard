@@ -7,81 +7,45 @@ When running the AI Development Dashboard from a web browser (e.g., on GitHub Pa
 In the browser console, you might see errors like:
 > Access to fetch at 'https://jules.googleapis.com/v1/tasks/...' from origin 'https://yourname.github.io' has been blocked by CORS policy.
 
-## Solution: Use a CORS Proxy
+## Solution: PHP CORS Proxy with Authentication
 
-A CORS proxy acts as an intermediary. Your browser sends the request to the proxy, which then forwards it to the Jules API. The proxy adds the necessary `Access-Control-Allow-Origin` headers to the response, allowing your browser to receive the data.
+A CORS proxy acts as an intermediary. Your browser sends the request to the proxy, which then forwards it to the Jules API. This script includes a simple security check to ensure only your dashboard can use the proxy.
 
-### Option 1: Cloudflare Workers (Recommended)
+### Setup Instructions
 
-Cloudflare Workers provide a free and secure way to set up your own proxy.
-
-1.  **Create a Worker:** Sign up for a free Cloudflare account and create a new Worker.
-2.  **Add the Code:** Use the following minimal script:
-
-```javascript
-addEventListener('fetch', event => {
-  event.respondWith(handleRequest(event.request))
-})
-
-async function handleRequest(request) {
-  const url = new URL(request.url)
-  // Extract the target path from the proxy request
-  // Example: your-proxy.workers.dev/v1/tasks/1/status -> jules.googleapis.com/v1/tasks/1/status
-  const targetUrl = 'https://jules.googleapis.com' + url.pathname
-
-  // Forward the request with original headers and method
-  let response = await fetch(targetUrl, {
-    method: request.method,
-    headers: request.headers,
-    body: request.body
-  })
-
-  // Add CORS headers to the response
-  response = new Response(response.body, response)
-  response.headers.set('Access-Control-Allow-Origin', '*')
-  response.headers.set('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-  response.headers.set('Access-Control-Allow-Headers', '*')
-
-  return response
-}
-```
-
-3.  **Deploy:** Save and deploy your worker. It will give you a URL like `https://your-proxy.yourname.workers.dev`.
-4.  **Update Dashboard:**
-    - Open the dashboard **Settings** (⚙️ icon).
-    - Update the **Jules API Base URL** to your worker URL (e.g., `https://your-proxy.yourname.workers.dev/v1`).
-    - Click **Save & Reload**.
-
-### Option 2: Local Proxy (For Development)
-
-If you are running the dashboard locally, you can use a tool like `cors-anywhere`.
-
-```bash
-npx cors-anywhere
-```
-By default, this runs on `http://localhost:8080`. You would then set your **Jules API Base URL** to `http://localhost:8080/https://jules.googleapis.com/v1`.
-
-### Option 3: PHP Server (For Webhosting)
-
-If you have a standard webhosting account with PHP support, you can use this simple proxy script.
-
-1.  **Create `proxy.php`:** Upload a file named `proxy.php` to your web server with the following content:
+1.  **Create `proxy.php`:** Upload a file named `proxy.php` to your web server with the following content.
+2.  **Set your Security Key:** Change `'your-secret-key-here'` to a long, random string.
 
 ```php
 <?php
 /**
- * Simple CORS Proxy for Jules API
+ * Secure CORS Proxy for Jules API
  */
+
+// --- CONFIGURATION ---
+define('PROXY_KEY', 'your-secret-key-here');
+// ---------------------
 
 // 1. Handle CORS Preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header("Access-Control-Allow-Origin: *");
     header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
-    header("Access-Control-Allow-Headers: *");
+    header("Access-Control-Allow-Headers: X-Proxy-Auth, Authorization, Content-Type");
     exit;
 }
 
-// 2. Prepare the target URL
+// 2. Check Proxy Authentication
+$headers = getallheaders();
+$proxyAuth = $headers['X-Proxy-Auth'] ?? $_SERVER['HTTP_X_PROXY_AUTH'] ?? '';
+
+if ($proxyAuth !== PROXY_KEY) {
+    header("Access-Control-Allow-Origin: *");
+    http_response_code(401);
+    echo json_encode(['error' => 'Unauthorized Proxy Access']);
+    exit;
+}
+
+// 3. Prepare the target URL
 // It takes the path after proxy.php and appends it to the Jules API base
 $path = $_SERVER['PATH_INFO'] ?? '';
 if (empty($path) && isset($_SERVER['REQUEST_URI'])) {
@@ -94,16 +58,16 @@ if (empty($path) && isset($_SERVER['REQUEST_URI'])) {
 }
 $targetUrl = 'https://jules.googleapis.com' . $path;
 
-// 3. Forward the request using cURL
+// 4. Forward the request using cURL
 $ch = curl_init($targetUrl);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $_SERVER['REQUEST_METHOD']);
 
-// Forward headers (excluding Host)
-$headers = getallheaders();
+// Forward headers (excluding Host and X-Proxy-Auth)
 $curlHeaders = [];
 foreach ($headers as $key => $value) {
-    if (strtolower($key) !== 'host') {
+    $lowerKey = strtolower($key);
+    if ($lowerKey !== 'host' && $lowerKey !== 'x-proxy-auth') {
         $curlHeaders[] = "$key: $value";
     }
 }
@@ -118,7 +82,7 @@ $response = curl_exec($ch);
 $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
-// 4. Send Response with CORS headers
+// 5. Send Response with CORS headers
 header("Access-Control-Allow-Origin: *");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
 header("Access-Control-Allow-Headers: *");
@@ -127,13 +91,14 @@ http_response_code($httpCode);
 echo $response;
 ```
 
-2.  **Update Dashboard:**
+3.  **Update Dashboard Settings:**
     - Open the dashboard **Settings** (⚙️ icon).
     - Update the **Jules API Base URL** to your proxy URL (e.g., `https://your-domain.com/proxy.php/v1`).
+    - Update the **Proxy Authentication** field with the same secret key you set in `proxy.php`.
     - Click **Save & Reload**.
 
 ---
 
 ## Important Security Note
 
-**Never use public, third-party CORS proxies** (like `cors-anywhere.herokuapp.com`) for the Jules API. These proxies can see your **Jules API Token** sent in the `Authorization` header. Always use a proxy that you control.
+**Never use public, third-party CORS proxies** (like `cors-anywhere.herokuapp.com`) for the Jules API. These proxies can see your **Jules API Token** sent in the `Authorization` header. Always use a proxy that you control and protect it with a secret key as shown above.

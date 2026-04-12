@@ -48,9 +48,11 @@ function App() {
   const [ghToken, setGhToken] = useState<string>(localStorage.getItem('github_token') || '');
   const [julesToken, setJulesToken] = useState<string>(localStorage.getItem('jules_token') || '');
   const [julesApiBase, setJulesApiBase] = useState<string>(localStorage.getItem('jules_api_base') || DEFAULT_JULES_API_BASE);
+  const [proxyAuth, setProxyAuth] = useState<string>(localStorage.getItem('proxy_auth') || '');
   const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [draftJulesApiBase, setDraftJulesApiBase] = useState<string>(julesApiBase);
+  const [draftProxyAuth, setDraftProxyAuth] = useState<string>(proxyAuth);
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
   const [repoHistory, setRepoHistory] = useState<string[]>(() => {
@@ -64,9 +66,10 @@ function App() {
       setDraftGhToken(ghToken);
       setDraftJulesToken(julesToken);
       setDraftJulesApiBase(julesApiBase);
+      setDraftProxyAuth(proxyAuth);
       setDraftRepoHistory(repoHistory.join(', '));
     }
-  }, [showSettings, ghToken, julesToken, julesApiBase, repoHistory]);
+  }, [showSettings, ghToken, julesToken, julesApiBase, proxyAuth, repoHistory]);
   const [filterState] = useState<'all' | 'open'>(
     (localStorage.getItem('filter_state') as 'all' | 'open') || 'all'
   );
@@ -108,11 +111,13 @@ function App() {
     const url = `${julesApiBase}/tasks/${issueId}/status`;
     console.log(`Fetching Jules status from: ${url}`);
     try {
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
+      const headers: Record<string, string> = {
+        'Authorization': `Bearer ${token}`
+      };
+      if (proxyAuth) {
+        headers['X-Proxy-Auth'] = proxyAuth;
+      }
+      const response = await fetch(url, { headers });
       console.log(`Jules API response status for issue ${issueId}: ${response.status}`);
       if (!response.ok) {
         return undefined;
@@ -140,10 +145,12 @@ function App() {
     localStorage.setItem('github_token', draftGhToken);
     localStorage.setItem('jules_token', draftJulesToken);
     localStorage.setItem('jules_api_base', draftJulesApiBase);
+    localStorage.setItem('proxy_auth', draftProxyAuth);
     localStorage.setItem('gh_repos', JSON.stringify(newRepos));
     setGhToken(draftGhToken);
     setJulesToken(draftJulesToken);
     setJulesApiBase(draftJulesApiBase);
+    setProxyAuth(draftProxyAuth);
     setRepoHistory(newRepos);
     setShowSettings(false);
     setRefreshTrigger(prev => prev + 1);
@@ -153,14 +160,17 @@ function App() {
     localStorage.removeItem('github_token');
     localStorage.removeItem('jules_token');
     localStorage.removeItem('jules_api_base');
+    localStorage.removeItem('proxy_auth');
     localStorage.removeItem('gh_repos');
     setGhToken('');
     setJulesToken('');
     setJulesApiBase(DEFAULT_JULES_API_BASE);
+    setProxyAuth('');
     setRepoHistory(['chatelao/AI-Dashboard']);
     setDraftGhToken('');
     setDraftJulesToken('');
     setDraftJulesApiBase(DEFAULT_JULES_API_BASE);
+    setDraftProxyAuth('');
     setDraftRepoHistory('chatelao/AI-Dashboard');
     setShowSettings(false);
     setRefreshTrigger(prev => prev + 1);
@@ -442,6 +452,16 @@ function App() {
             <small className="help-text">
               Use this to configure a CORS proxy if needed. See <a href="https://github.com/chatelao/AI-Dashboard/blob/main/CORS_PROXY.md" target="_blank" rel="noopener noreferrer">CORS_PROXY.md</a> for instructions.
             </small>
+          </div>
+          <div className="settings-group">
+            <label htmlFor="proxy-auth">Proxy Authentication:</label>
+            <input
+              id="proxy-auth"
+              type="password"
+              value={draftProxyAuth}
+              onChange={(e) => setDraftProxyAuth(e.target.value)}
+              placeholder="Enter proxy security key"
+            />
           </div>
           <div className="settings-group">
             <label htmlFor="repo-history">Tracked Repositories (comma-separated):</label>
