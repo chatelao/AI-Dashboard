@@ -23,6 +23,19 @@ If you have a standard webhosting account with PHP support, you can use this sim
  * Simple CORS Proxy for Jules API
  */
 
+// Polyfill for getallheaders() if it doesn't exist
+if (!function_exists('getallheaders')) {
+    function getallheaders() {
+        $headers = [];
+        foreach ($_SERVER as $name => $value) {
+            if (substr($name, 0, 5) == 'HTTP_') {
+                $headers[str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))))] = $value;
+            }
+        }
+        return $headers;
+    }
+}
+
 // 1. Handle CORS Preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header("Access-Control-Allow-Origin: *");
@@ -42,6 +55,12 @@ if (empty($path) && isset($_SERVER['REQUEST_URI'])) {
         $path = substr($requestUri, strlen($scriptName));
     }
 }
+
+// Auto-prepend /v1 if missing and not empty
+if (!empty($path) && strpos($path, '/v1/') !== 0 && $path !== '/v1') {
+    $path = '/v1' . $path;
+}
+
 $targetUrl = 'https://jules.googleapis.com' . $path;
 
 // 3. Forward the request using cURL
