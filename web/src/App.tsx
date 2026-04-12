@@ -271,7 +271,17 @@ function App() {
         const allReposResults = await Promise.all(
           effectiveRepoList.map(repo => fetchRawIssues(repo, filterState, headers))
         );
-        const issuesData = allReposResults.flat();
+
+        const filteredReposResults = allReposResults.map(repoIssues => {
+          const openIssues = repoIssues.filter(i => i.state === 'open');
+          const closedIssues = repoIssues
+            .filter(i => i.state === 'closed')
+            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+            .slice(0, 4);
+          return [...openIssues, ...closedIssues];
+        });
+
+        const issuesData = filteredReposResults.flat();
 
         // Fetch PR metadata in bulk to get SHAs
         const prMetadataMap = new Map<string, string>();
