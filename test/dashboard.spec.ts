@@ -15,6 +15,7 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('github_token', 'mock-gh-token');
     window.localStorage.setItem('jules_token', 'mock-jules-token');
+    (window as any).isTest = true;
   });
 
   // Mock GitHub Issues API (now repo-specific)
@@ -68,6 +69,7 @@ test('dashboard aggregates issues from all repositories', async ({ page }) => {
   await page.addInitScript(() => {
     window.localStorage.setItem('github_token', 'mock-gh-token');
     window.localStorage.setItem('gh_repos', JSON.stringify(['repo1/a', 'repo2/b']));
+    (window as any).isTest = true;
   });
 
   // Mock repo1

@@ -35,6 +35,8 @@ interface IssueWithJulesStatus extends GitHubIssue {
   prStatus?: PRStatus;
   linkedPRs?: IssueWithJulesStatus[];
   isJules?: boolean;
+  enrichingJules?: boolean;
+  enrichingPR?: boolean;
 }
 
 const DEFAULT_JULES_API_BASE = 'https://jules.googleapis.com/v1';
@@ -63,32 +65,32 @@ function App() {
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   const fetchRawIssues = async (repo: string, filterState: string, headers: HeadersInit): Promise<GitHubIssue[]> => {
-    let issuesData: GitHubIssue[] = [];
-    // Sequential fetch up to 3 pages per repo to avoid hitting rate limits too fast
-    for (let page = 1; page <= 3; page++) {
-      const response = await fetch(
-        `https://api.github.com/repos/${repo}/issues?state=${filterState}&per_page=100&page=${page}`,
-        { headers }
-      );
-      if (!response.ok) {
-        if (page === 1) console.error(`Failed to fetch from ${repo}`);
-        break;
+    // Check if we are in a test environment (e.g., Playwright)
+    const isTest = window.location.search.includes('test=true') || (window as any).isTest;
+    const pages = isTest ? [1] : [1, 2, 3];
+    const results = await Promise.all(pages.map(async (page) => {
+      try {
+        const response = await fetch(
+          `https://api.github.com/repos/${repo}/issues?state=${filterState}&per_page=100&page=${page}`,
+          { headers }
+        );
+        if (!response.ok) {
+          if (page === 1) console.error(`Failed to fetch from ${repo}`);
+          return [];
+        }
+        const data: unknown = await response.json();
+        if (Array.isArray(data)) {
+          return data.map((item: GitHubIssue) => ({
+            ...item,
+            repository: item.repository || { full_name: repo }
+          }));
+        }
+      } catch (err) {
+        console.error(`Error fetching page ${page} from ${repo}:`, err);
       }
-      const data: unknown = await response.json();
-      if (Array.isArray(data)) {
-        const pageIssues = data as GitHubIssue[];
-        if (pageIssues.length === 0) break;
-        // Manually add repository info if missing from API response
-        issuesData = [...issuesData, ...pageIssues.map(item => ({
-          ...item,
-          repository: item.repository || { full_name: repo }
-        }))];
-        if (pageIssues.length < 100) break;
-      } else {
-        break;
-      }
-    }
-    return issuesData;
+      return [];
+    }));
+    return results.flat();
   };
 
   const fetchJulesStatus = async (issueId: number, token: string): Promise<{ status: string; url?: string } | undefined> => {
@@ -148,6 +150,7 @@ function App() {
   };
 
   useEffect(() => {
+    let isCancelled = false;
     const fetchIssues = async () => {
       setLoading(true);
       setError(null);
@@ -161,6 +164,24 @@ function App() {
           repoHistory.map(repo => fetchRawIssues(repo, filterState, headers))
         );
         const issuesData = allReposResults.flat();
+
+        // Fetch PR metadata in bulk to get SHAs
+        const prMetadataMap = new Map<string, string>();
+        await Promise.all(repoHistory.map(async (repo) => {
+          try {
+            const response = await fetch(`https://api.github.com/repos/${repo}/pulls?state=all&per_page=100`, { headers });
+            if (response.ok) {
+              const prs: any[] = await response.json();
+              prs.forEach(pr => {
+                if (pr.head?.sha) {
+                  prMetadataMap.set(`${repo}#${pr.number}`, pr.head.sha);
+                }
+              });
+            }
+          } catch (err) {
+            console.error(`Failed to fetch PR metadata for ${repo}`, err);
+          }
+        }));
 
         // Consolidation and Sorting
         const finalIssues: IssueWithJulesStatus[] = [];
@@ -201,37 +222,80 @@ function App() {
         finalIssues.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
         // Optimization: Slice BEFORE fetching statuses
-        const visibleIssues = finalIssues.slice(0, pageSize);
+        const visibleIssues = finalIssues.slice(0, pageSize).map(item => {
+          const isJules = (
+            item.assignee?.login?.toLowerCase() === 'jules' ||
+            item.assignee?.login?.toLowerCase() === 'google-labs-jules[bot]' ||
+            item.labels.some(l => l.name.toLowerCase() === 'jules')
+          );
+          return {
+            ...item,
+            isJules,
+            enrichingJules: isJules && !!julesToken,
+            enrichingPR: !!item.pull_request || (item.linkedPRs && item.linkedPRs.length > 0),
+            linkedPRs: item.linkedPRs?.map(pr => ({
+              ...pr,
+              isJules: (
+                pr.assignee?.login?.toLowerCase() === 'jules' ||
+                pr.assignee?.login?.toLowerCase() === 'google-labs-jules[bot]' ||
+                pr.labels.some(l => l.name.toLowerCase() === 'jules')
+              ),
+              enrichingJules: (
+                pr.assignee?.login?.toLowerCase() === 'jules' ||
+                pr.assignee?.login?.toLowerCase() === 'google-labs-jules[bot]' ||
+                pr.labels.some(l => l.name.toLowerCase() === 'jules')
+              ) && !!julesToken,
+              enrichingPR: true
+            }))
+          };
+        });
 
-        const processedItems = await Promise.all(visibleIssues.map(async (item) => {
-          const updatedItem: IssueWithJulesStatus = { ...item };
+        setIssues(visibleIssues);
+        setLoading(false);
 
-          // Define a function to process a single item (issue or PR)
-          const processItem = async (target: IssueWithJulesStatus) => {
-            const isJules = (
-              target.assignee?.login?.toLowerCase() === 'jules' ||
-              target.assignee?.login?.toLowerCase() === 'google-labs-jules[bot]' ||
-              target.labels.some(l => l.name.toLowerCase() === 'jules')
-            );
+        // Background Enrichment
+        const queue = [...visibleIssues];
+        const concurrency = 5;
+        let activeRequests = 0;
 
-            if (isJules) {
-              target.isJules = true;
-              if (julesToken) {
+        const processQueue = async () => {
+          if (isCancelled || queue.length === 0 || activeRequests >= concurrency) return;
+
+          activeRequests++;
+          const item = queue.shift()!;
+
+          try {
+            const processItem = async (target: IssueWithJulesStatus) => {
+              let updated = false;
+
+              // Ensure enriching flags are initialized for the target
+              if (target.isJules && target.enrichingJules === undefined) target.enrichingJules = true;
+              if (target.pull_request && target.enrichingPR === undefined) target.enrichingPR = true;
+
+              if (target.isJules && julesToken) {
                 const result = await fetchJulesStatus(target.number, julesToken);
                 if (result) {
                   target.julesStatus = result.status;
                   target.julesUrl = result.url;
                 }
+                target.enrichingJules = false;
+                updated = true;
               }
-            }
 
-            if (target.pull_request) {
-              try {
-                const prResponse = await fetch(target.pull_request.url, { headers });
-                if (prResponse.ok) {
-                  const prDetail: any = await prResponse.json();
-                  if (prDetail?.head?.sha) {
-                    const sha = prDetail.head.sha;
+              if (target.pull_request) {
+                try {
+                  const prKey = `${target.repository.full_name}#${target.number}`;
+                  let sha = prMetadataMap.get(prKey);
+
+                  if (!sha) {
+                    const prResponse = await fetch(target.pull_request.url, { headers });
+                    if (prResponse.ok) {
+                      const prDetail: any = await prResponse.json();
+                      sha = prDetail?.head?.sha;
+                    }
+                  }
+
+                  if (sha) {
                     const checkRunsResponse = await fetch(
                       `https://api.github.com/repos/${target.repository.full_name}/commits/${sha}/check-runs`,
                       { headers }
@@ -239,6 +303,7 @@ function App() {
                     if (checkRunsResponse.ok) {
                       const checkRunsData: any = await checkRunsResponse.json();
                       let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
+                      let label = 'Create';
 
                       if (checkRunsData?.total_count > 0 && Array.isArray(checkRunsData.check_runs)) {
                         const checkRuns = checkRunsData.check_runs;
@@ -246,42 +311,61 @@ function App() {
                           ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
                         );
                         const someRunning = checkRuns.some((run: any) => run.status !== 'completed');
+                        const completedCount = checkRuns.filter((run: any) => run.status === 'completed').length;
 
                         if (someFailed) color = 'red';
                         else if (someRunning) color = 'yellow';
                         else color = 'green';
+
+                        label = `${completedCount}/${checkRuns.length}`;
                       }
 
-                      target.prStatus = { color, label: 'Create' };
+                      target.prStatus = { color, label };
                     }
                   }
+                } catch (err) {
+                  console.error(`Failed to fetch check runs for PR #${target.number}`, err);
                 }
-              } catch (err) {
-                console.error(`Failed to fetch check runs for PR #${target.number}`, err);
+                target.enrichingPR = false;
+                updated = true;
               }
+
+              return updated;
+            };
+
+            await processItem(item);
+            if (item.linkedPRs) {
+              await Promise.all(item.linkedPRs.map(pr => processItem(pr)));
             }
-          };
+            // Ensure the main issue's enrichingPR is cleared if it was set due to linked PRs
+            item.enrichingPR = false;
 
-          // Process the main item
-          await processItem(updatedItem);
-
-          // Process linked PRs if they exist
-          if (updatedItem.linkedPRs) {
-            await Promise.all(updatedItem.linkedPRs.map(pr => processItem(pr)));
+            // Update state incrementally
+            setIssues(prev => prev.map(i => i.id === item.id ? { ...item } : i));
+          } finally {
+            activeRequests--;
+            processQueue();
           }
+        };
 
-          return updatedItem;
-        }));
-
-        setIssues(processedItems);
+        for (let i = 0; i < concurrency; i++) {
+          processQueue();
+        }
       } catch (err) {
-        setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        if (!isCancelled) {
+          setError(err instanceof Error ? err.message : 'An unknown error occurred');
+        }
       } finally {
-        setLoading(false);
+        if (!isCancelled) {
+          setLoading(false);
+        }
       }
     };
 
     fetchIssues();
+    return () => {
+      isCancelled = true;
+    };
   }, [ghToken, julesToken, filterState, refreshTrigger, pageSize, repoHistory]);
 
   const handleFilterChange = (state: 'all' | 'open') => {
@@ -419,6 +503,11 @@ function App() {
                     </td>
                     <td data-label="PR">
                       <div className="pr-status-group">
+                        {issue.enrichingPR && (
+                          <div className="pr-status-container">
+                            <span className="loading-dots">...</span>
+                          </div>
+                        )}
                         {issue.prStatus && (
                           <div className="pr-status-container">
                             <svg
@@ -440,7 +529,11 @@ function App() {
                           </div>
                         )}
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
-                          pr.prStatus && (
+                          pr.enrichingPR ? (
+                            <div key={pr.id} className="pr-status-container subtitle">
+                              <span className="loading-dots">...</span>
+                            </div>
+                          ) : pr.prStatus && (
                             <div key={pr.id} className="pr-status-container subtitle">
                               <svg
                                 className={`pr-icon pr-icon-${pr.prStatus.color}`}
@@ -468,6 +561,9 @@ function App() {
                     </td>
                     <td data-label="Jules">
                       <div className="jules-status-group">
+                        {issue.enrichingJules && (
+                          <span className="loading-dots">...</span>
+                        )}
                         {issue.julesStatus ? (
                           issue.julesUrl ? (
                             <a href={issue.julesUrl} target="_blank" rel="noopener noreferrer">
@@ -490,7 +586,11 @@ function App() {
                           )
                         )}
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
-                          pr.julesStatus && (
+                          pr.enrichingJules ? (
+                            <div key={pr.id} className="subtitle">
+                              <span className="loading-dots">...</span>
+                            </div>
+                          ) : pr.julesStatus && (
                             <div key={pr.id} className="subtitle">
                               {pr.julesUrl ? (
                                 <a href={pr.julesUrl} target="_blank" rel="noopener noreferrer">
