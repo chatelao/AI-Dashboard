@@ -28,7 +28,10 @@ The application logs its progress:
 
 **Common Error Indicators:**
 - **401 Unauthorized:** Your `jules_token` is invalid or expired.
-- **404 Not Found:** The Jules API does not have a task corresponding to that GitHub issue number.
+- **404 Not Found:** This can happen for several reasons:
+  - The Jules API does not have a task corresponding to that GitHub issue number.
+  - The **Jules API Base URL** in Settings is incorrect. It **must** include the `/v1` suffix (e.g., `https://jules.googleapis.com/v1`).
+  - Your CORS proxy is misconfigured and is not forwarding the `Authorization` header correctly. See [CORS_PROXY.md](CORS_PROXY.md) for a robust proxy script.
 - **CORS Errors:** If you see "Access-Control-Allow-Origin" errors, the Jules API might not be configured to allow requests from your current domain (e.g., `localhost` or `github.io`). See [Resolving CORS Errors](#resolving-cors-errors) below.
 
 ## 4. Resolving CORS Errors
