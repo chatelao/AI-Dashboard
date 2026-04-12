@@ -32,19 +32,6 @@ h1 {
   gap: 0.5rem;
 }
 
-.settings-toggle {
-  background: none;
-  border: 1px solid #333;
-  border-radius: 4px;
-  padding: 8px;
-  cursor: pointer;
-  font-size: 1.2rem;
-  transition: background-color 0.2s;
-}
-
-.settings-toggle:hover {
-  background-color: #333;
-}
 
 .settings-panel {
   background-color: #1a1a1a;
@@ -135,45 +122,41 @@ h1 {
   background-color: #30363d;
 }
 
-.filters-bar {
-  display: flex;
-  align-items: center;
-  gap: 1rem;
-  margin-bottom: 1rem;
-  padding: 0.5rem 1rem;
-  background-color: #1a1a1a;
-  border-radius: 6px;
-  border: 1px solid #333;
-  flex-wrap: wrap;
-}
-
-.filter-group {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  font-size: 0.9rem;
-  color: #aaa;
-}
-
-.filter-group select {
-  padding: 4px 8px;
-  background-color: #0d1117;
-  border: 1px solid #30363d;
-  border-radius: 4px;
-  color: #c9d1d9;
-}
 
 .btn-refresh {
-  padding: 4px 12px;
+  padding: 8px 16px;
   background-color: #21262d;
   border: 1px solid #30363d;
   border-radius: 6px;
   color: #c9d1d9;
   cursor: pointer;
   font-size: 0.9rem;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  box-sizing: border-box;
 }
 
 .btn-refresh:hover {
+  background-color: #30363d;
+}
+
+.settings-toggle {
+  background: none;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 0;
+  cursor: pointer;
+  font-size: 1.2rem;
+  transition: background-color 0.2s;
+  width: 38px;
+  height: 38px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.settings-toggle:hover {
   background-color: #30363d;
 }
 
@@ -335,21 +318,8 @@ a:hover {
     justify-content: flex-end;
   }
 
-  .filters-bar {
-    gap: 0.5rem;
-    padding: 0.5rem;
-  }
-
-  .filter-group {
-    flex-grow: 1;
-  }
-
-  .filter-group select {
-    width: 100%;
-  }
-
   .btn-refresh {
-    width: 100%;
+    width: auto;
   }
 
   header p {
