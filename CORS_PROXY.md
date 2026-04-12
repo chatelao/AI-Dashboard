@@ -61,6 +61,77 @@ npx cors-anywhere
 ```
 By default, this runs on `http://localhost:8080`. You would then set your **Jules API Base URL** to `http://localhost:8080/https://jules.googleapis.com/v1`.
 
+### Option 3: PHP Server (For Webhosting)
+
+If you have a standard webhosting account with PHP support, you can use this simple proxy script.
+
+1.  **Create `proxy.php`:** Upload a file named `proxy.php` to your web server with the following content:
+
+```php
+<?php
+/**
+ * Simple CORS Proxy for Jules API
+ */
+
+// 1. Handle CORS Preflight
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    header("Access-Control-Allow-Origin: *");
+    header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+    header("Access-Control-Allow-Headers: *");
+    exit;
+}
+
+// 2. Prepare the target URL
+// It takes the path after proxy.php and appends it to the Jules API base
+$path = $_SERVER['PATH_INFO'] ?? '';
+if (empty($path) && isset($_SERVER['REQUEST_URI'])) {
+    // Fallback if PATH_INFO is not set
+    $scriptName = $_SERVER['SCRIPT_NAME'];
+    $requestUri = explode('?', $_SERVER['REQUEST_URI'])[0];
+    if (strpos($requestUri, $scriptName) === 0) {
+        $path = substr($requestUri, strlen($scriptName));
+    }
+}
+$targetUrl = 'https://jules.googleapis.com' . $path;
+
+// 3. Forward the request using cURL
+$ch = curl_init($targetUrl);
+curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $_SERVER['REQUEST_METHOD']);
+
+// Forward headers (excluding Host)
+$headers = getallheaders();
+$curlHeaders = [];
+foreach ($headers as $key => $value) {
+    if (strtolower($key) !== 'host') {
+        $curlHeaders[] = "$key: $value";
+    }
+}
+curl_setopt($ch, CURLOPT_HTTPHEADER, $curlHeaders);
+
+// Forward POST body
+if ($_SERVER['REQUEST_METHOD'] === 'POST') {
+    curl_setopt($ch, CURLOPT_POSTFIELDS, file_get_contents('php://input'));
+}
+
+$response = curl_exec($ch);
+$httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+curl_close($ch);
+
+// 4. Send Response with CORS headers
+header("Access-Control-Allow-Origin: *");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Headers: *");
+header("Content-Type: application/json");
+http_response_code($httpCode);
+echo $response;
+```
+
+2.  **Update Dashboard:**
+    - Open the dashboard **Settings** (⚙️ icon).
+    - Update the **Jules API Base URL** to your proxy URL (e.g., `https://your-domain.com/proxy.php/v1`).
+    - Click **Save & Reload**.
+
 ---
 
 ## Important Security Note
