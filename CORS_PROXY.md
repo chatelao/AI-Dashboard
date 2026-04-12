@@ -23,6 +23,19 @@ If you have a standard webhosting account with PHP support, you can use this sim
  * Simple CORS Proxy for Jules API
  */
 
+// Polyfill for getallheaders() if it doesn't exist
+if (!function_exists('getallheaders')) {
+    function getallheaders() {
+        $headers = [];
+        foreach ($_SERVER as $name => $value) {
+            if (substr($name, 0, 5) == 'HTTP_') {
+                $headers[str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))))] = $value;
+            }
+        }
+        return $headers;
+    }
+}
+
 // 1. Handle CORS Preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header("Access-Control-Allow-Origin: *");
@@ -32,17 +45,35 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
 }
 
 // 2. Prepare the target URL
-// It takes the path after proxy.php and appends it to the Jules API base
-$path = $_SERVER['PATH_INFO'] ?? '';
-if (empty($path) && isset($_SERVER['REQUEST_URI'])) {
-    // Fallback if PATH_INFO is not set
-    $scriptName = $_SERVER['SCRIPT_NAME'];
-    $requestUri = explode('?', $_SERVER['REQUEST_URI'])[0];
-    if (strpos($requestUri, $scriptName) === 0) {
-        $path = substr($requestUri, strlen($scriptName));
+if (isset($_GET['url'])) {
+    // Use explicit URL if provided (preferred for some server configs)
+    $targetUrl = $_GET['url'];
+
+    // SECURITY: Only allow requests to the Jules API
+    if (strpos($targetUrl, 'https://jules.googleapis.com/') !== 0) {
+        http_response_code(403);
+        echo json_encode(["error" => "Forbidden: Target URL must be https://jules.googleapis.com/"]);
+        exit;
     }
+} else {
+    // Fallback: It takes the path after proxy.php and appends it to the Jules API base
+    $path = $_SERVER['PATH_INFO'] ?? '';
+    if (empty($path) && isset($_SERVER['REQUEST_URI'])) {
+        // Fallback if PATH_INFO is not set
+        $scriptName = $_SERVER['SCRIPT_NAME'];
+        $requestUri = explode('?', $_SERVER['REQUEST_URI'])[0];
+        if (strpos($requestUri, $scriptName) === 0) {
+            $path = substr($requestUri, strlen($scriptName));
+        }
+    }
+
+    // Auto-prepend /v1 if missing and not empty
+    if (!empty($path) && strpos($path, '/v1/') !== 0 && $path !== '/v1') {
+        $path = '/v1' . $path;
+    }
+
+    $targetUrl = 'https://jules.googleapis.com' . $path;
 }
-$targetUrl = 'https://jules.googleapis.com' . $path;
 
 // 3. Forward the request using cURL
 $ch = curl_init($targetUrl);
@@ -79,7 +110,9 @@ echo $response;
 
 2.  **Update Dashboard:**
     - Open the dashboard **Settings** (⚙️ icon).
-    - Update the **Jules API Base URL** to your proxy URL (e.g., `https://your-domain.com/proxy.php/v1`).
+    - Update the **Jules API Base URL** to your proxy URL.
+    - If your server doesn't support paths after `.php`, use the `?url=` format: `https://your-domain.com/proxy.php?url=`
+    - Otherwise, you can use the path format: `https://your-domain.com/proxy.php/v1`
     - Click **Save & Reload**.
 
 ---
