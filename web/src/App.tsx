@@ -178,7 +178,7 @@ function App() {
       };
 
       // Conditionally set auth headers to avoid conflicts
-      if (token.startsWith('AIza')) {
+      if (token.startsWith('AIza') || token.startsWith('AQ.')) {
         headers['X-Goog-Api-Key'] = token;
       } else {
         headers['Authorization'] = `Bearer ${token}`;
