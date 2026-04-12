@@ -243,10 +243,14 @@ a:hover {
   color: white;
 }
 
-.jules-status-researching { background-color: #0366d6; color: white; }
-.jules-status-coding { background-color: #f1e05a; color: black; }
+.jules-status-researching, .jules-status-planning { background-color: #0366d6; color: white; }
+.jules-status-coding, .jules-status-in-progress { background-color: #f1e05a; color: black; }
 .jules-status-testing { background-color: #f66a0a; color: white; }
 .jules-status-completed { background-color: #28a745; color: white; }
+.jules-status-queued { background-color: #6a737d; color: white; }
+.jules-status-awaiting-plan-approval, .jules-status-awaiting-user-feedback { background-color: #d29922; color: white; }
+.jules-status-paused { background-color: #8b949e; color: white; }
+.jules-status-failed { background-color: #f85149; color: white; }
 
 .text-muted {
   color: #666;

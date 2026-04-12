@@ -120,14 +120,19 @@ function App() {
     }
     console.log(`Fetching Jules status from: ${url}`);
     try {
-      const response = await fetch(url, {
-        headers: {
-          'Accept': 'application/json',
-          'Authorization': `Bearer ${token}`,
-          'X-Authorization': `Bearer ${token}`,
-          'X-Goog-Api-Key': token
-        }
-      });
+      const headers: HeadersInit = {
+        'Accept': 'application/json',
+      };
+
+      // Conditionally set auth headers to avoid conflicts
+      if (token.startsWith('AIza')) {
+        headers['X-Goog-Api-Key'] = token;
+      } else {
+        headers['Authorization'] = `Bearer ${token}`;
+        headers['X-Authorization'] = `Bearer ${token}`; // Fallback for proxy
+      }
+
+      const response = await fetch(url, { headers });
       console.log(`Jules API response status for issue ${issueId}: ${response.status}`);
       if (!response.ok) {
         if (response.status === 404) {
@@ -143,7 +148,7 @@ function App() {
         const session = data.sessions[0];
         if (session.state) {
           return {
-            status: session.state.replace('STATE_', '').replace(/_/g, ' ').toLowerCase(),
+            status: session.state.replace('STATE_', '').replace(/_/g, '-').toLowerCase(),
             url: session.url
           };
         }
@@ -707,13 +712,13 @@ function App() {
                         {issue.julesStatus ? (
                           issue.julesUrl ? (
                             <a href={issue.julesUrl} target="_blank" rel="noopener noreferrer">
-                              <span className={`badge jules-status-${issue.julesStatus.toLowerCase()}`}>
-                                {issue.julesStatus}
+                              <span className={`badge jules-status-${issue.julesStatus}`}>
+                                {issue.julesStatus.replace(/-/g, ' ')}
                               </span>
                             </a>
                           ) : (
-                            <span className={`badge jules-status-${issue.julesStatus.toLowerCase()}`}>
-                              {issue.julesStatus}
+                            <span className={`badge jules-status-${issue.julesStatus}`}>
+                              {issue.julesStatus.replace(/-/g, ' ')}
                             </span>
                           )
                         ) : (
@@ -734,13 +739,13 @@ function App() {
                             <div key={pr.id} className="subtitle">
                               {pr.julesUrl ? (
                                 <a href={pr.julesUrl} target="_blank" rel="noopener noreferrer">
-                                  <span className={`badge jules-status-${pr.julesStatus.toLowerCase()}`}>
-                                    {pr.julesStatus}
+                                  <span className={`badge jules-status-${pr.julesStatus}`}>
+                                    {pr.julesStatus.replace(/-/g, ' ')}
                                   </span>
                                 </a>
                               ) : (
-                                <span className={`badge jules-status-${pr.julesStatus.toLowerCase()}`}>
-                                  {pr.julesStatus}
+                                <span className={`badge jules-status-${pr.julesStatus}`}>
+                                  {pr.julesStatus.replace(/-/g, ' ')}
                                 </span>
                               )}
                             </div>

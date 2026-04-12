@@ -43,16 +43,34 @@ if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     exit;
 }
 
-$headers = getallheaders_robust();
+// Prepare target URL logic (mirrored from CORS_PROXY.md)
+$path = $_SERVER['PATH_INFO'] ?? '';
+if (empty($path) && isset($_SERVER['REQUEST_URI'])) {
+    $scriptName = $_SERVER['SCRIPT_NAME'];
+    $requestUri = explode('?', $_SERVER['REQUEST_URI'])[0];
+    if (strpos($requestUri, $scriptName) === 0) {
+        $path = substr($requestUri, strlen($scriptName));
+    }
+}
+
+// Auto-prepend /v1 if missing and not already v1 or v1alpha
+if (!empty($path) &&
+    strpos($path, '/v1/') !== 0 && $path !== '/v1' &&
+    strpos($path, '/v1alpha/') !== 0 && $path !== '/v1alpha') {
+    $path = '/v1' . $path;
+}
+
+$targetUrl = 'https://jules.googleapis.com' . $path;
+
+$receivedHeaders = getallheaders_robust();
 header("Access-Control-Allow-Origin: $origin");
 header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
 header("Access-Control-Allow-Headers: *");
 header("Access-Control-Allow-Credentials: true");
 header('Content-Type: application/json');
 
-// Mock response based on the request URI for v1alpha/sessions
-$uri = $_SERVER['REQUEST_URI'] ?? '';
-if (strpos($uri, 'v1alpha/sessions') !== false) {
+// Mock response based on the targetUrl for v1alpha/sessions
+if (strpos($targetUrl, '/v1alpha/sessions') !== false) {
     $filter = $_GET['filter'] ?? '';
     $issueNumber = 'unknown';
     if (preg_match('/#(\d+)/', $filter, $matches)) {
@@ -73,4 +91,4 @@ if (strpos($uri, 'v1alpha/sessions') !== false) {
     exit;
 }
 
-echo json_encode(['headers' => $headers, 'server' => $_SERVER]);
+echo json_encode(['headers' => $receivedHeaders, 'targetUrl' => $targetUrl, 'server' => $_SERVER]);
