@@ -34,6 +34,9 @@ interface IssueWithJulesStatus extends GitHubIssue {
   prStatus?: PRStatus;
   linkedPRs?: IssueWithJulesStatus[];
   isJules?: boolean;
+  enrichingJules?: boolean;
+  enrichingPR?: boolean;
+  headSha?: string;
 }
 
 const JULES_API_BASE_URL = 'https://jules.googleapis.com/v1';
@@ -62,19 +65,16 @@ function App() {
 
   const fetchJulesStatus = async (issueId: number, token: string): Promise<{ status: string; url?: string } | undefined> => {
     const url = `${JULES_API_BASE_URL}/tasks/${issueId}/status`;
-    console.log(`Fetching Jules status from: ${url}`);
     try {
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
-      console.log(`Jules API response status for issue ${issueId}: ${response.status}`);
       if (!response.ok) {
         return undefined;
       }
-      const data: unknown = await response.json();
-      console.log(`Jules API response data for issue ${issueId}:`, data);
+      const data: any = await response.json();
       if (data && typeof data === 'object' && 'status' in data && typeof data.status === 'string') {
         const result: { status: string; url?: string } = { status: data.status };
         if ('url' in data && typeof data.url === 'string') {
@@ -112,43 +112,39 @@ function App() {
   };
 
   useEffect(() => {
-    const fetchIssues = async () => {
+    const fetchIssuesAndEnrich = async () => {
       setLoading(true);
       setError(null);
       try {
-        const headers: HeadersInit = {};
+        const headers: HeadersInit = {
+          'Accept': 'application/vnd.github.v3+json'
+        };
         if (ghToken) {
           headers['Authorization'] = `token ${ghToken}`;
         }
 
-        let issuesData: GitHubIssue[] = [];
-        // Sequential fetch up to 5 pages
-        for (let page = 1; page <= 5; page++) {
-          const response = await fetch(
-            `https://api.github.com/repos/${currentRepo}/issues?state=${filterState}&per_page=100&page=${page}`,
-            { headers }
-          );
-          if (!response.ok) {
-            if (page === 1) throw new Error(`Failed to fetch from ${currentRepo}`);
-            break;
-          }
-          const data: unknown = await response.json();
-          if (Array.isArray(data)) {
-            const pageIssues = data as GitHubIssue[];
-            if (pageIssues.length === 0) break;
-            // Manually add repository info if missing from API response (e.g. some repo endpoints)
-            issuesData = [...issuesData, ...pageIssues.map(item => ({
-              ...item,
-              repository: item.repository || { full_name: currentRepo }
-            }))];
-            if (pageIssues.length < 100) break;
-          } else {
-            break;
-          }
-        }
+        const pageRange = [1, 2, 3, 4, 5];
+        const [issuesResults, pullsResults] = await Promise.all([
+          Promise.all(pageRange.map(page =>
+            fetch(`https://api.github.com/repos/${currentRepo}/issues?state=${filterState}&per_page=100&page=${page}`, { headers })
+              .then(res => res.ok ? res.json() : [])
+          )),
+          Promise.all(pageRange.map(page =>
+            fetch(`https://api.github.com/repos/${currentRepo}/pulls?state=all&per_page=100&page=${page}`, { headers })
+              .then(res => res.ok ? res.json() : [])
+          ))
+        ]);
 
-        const processedItems = await Promise.all(issuesData.map(async (item) => {
-          const updatedItem: IssueWithJulesStatus = { ...item };
+        const allIssues: GitHubIssue[] = issuesResults.flat();
+        const allPulls: any[] = pullsResults.flat();
+
+        const pullsMap = new Map<number, any>(allPulls.map(p => [p.number, p]));
+
+        const processedItems: IssueWithJulesStatus[] = allIssues.map(item => {
+          const updatedItem: IssueWithJulesStatus = {
+            ...item,
+            repository: item.repository || { full_name: currentRepo }
+          };
 
           const isJules = (
             item.assignee?.login?.toLowerCase() === 'jules' ||
@@ -158,75 +154,28 @@ function App() {
 
           if (isJules) {
             updatedItem.isJules = true;
-            if (julesToken) {
-              const result = await fetchJulesStatus(item.number, julesToken);
-              if (result) {
-                updatedItem.julesStatus = result.status;
-                updatedItem.julesUrl = result.url;
-              }
-            } else {
-              console.log(`Issue #${item.number} is a Jules task but julesToken is missing.`);
-            }
+            updatedItem.enrichingJules = !!julesToken;
           }
 
           if (item.pull_request) {
-            try {
-              // Fetch full PR details to get head.sha
-              const prResponse = await fetch(item.pull_request.url, { headers });
-              if (prResponse.ok) {
-                const prDetail: unknown = await prResponse.json();
-                if (prDetail && typeof prDetail === 'object' && 'head' in prDetail && prDetail.head && typeof prDetail.head === 'object' && 'sha' in prDetail.head) {
-                  const sha = (prDetail.head as { sha: string }).sha;
-                  const checkRunsResponse = await fetch(
-                    `https://api.github.com/repos/${item.repository.full_name}/commits/${sha}/check-runs`,
-                    { headers }
-                  );
-                  if (checkRunsResponse.ok) {
-                    const checkRunsData: unknown = await checkRunsResponse.json();
-                    let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
-
-                    if (checkRunsData && typeof checkRunsData === 'object' && 'total_count' in checkRunsData && typeof checkRunsData.total_count === 'number' && checkRunsData.total_count > 0 && 'check_runs' in checkRunsData && Array.isArray(checkRunsData.check_runs)) {
-                      const checkRuns = checkRunsData.check_runs as { status: string; conclusion: string }[];
-                      const someFailed = checkRuns.some(run =>
-                        ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
-                      );
-                      const someRunning = checkRuns.some(run => run.status !== 'completed');
-
-                      if (someFailed) {
-                        color = 'red';
-                      } else if (someRunning) {
-                        color = 'yellow';
-                      } else {
-                        color = 'green';
-                      }
-                    }
-
-                    updatedItem.prStatus = {
-                      color,
-                      label: 'Create'
-                    };
-                  }
-                }
-              }
-            } catch (err) {
-              console.error(`Failed to fetch check runs for PR #${item.number}`, err);
+            updatedItem.enrichingPR = true;
+            const pullData = pullsMap.get(item.number);
+            if (pullData && pullData.head && pullData.head.sha) {
+              updatedItem.headSha = pullData.head.sha;
             }
           }
 
           return updatedItem;
-        }));
+        });
 
         const finalIssues: IssueWithJulesStatus[] = [];
         const linkedPrNumbers = new Set<number>();
 
-        // First, separate issues and PRs
         const issuesOnly = processedItems.filter(item => !item.pull_request);
         const prsOnly = processedItems.filter(item => item.pull_request);
 
-        // Map issues by repo#number for easy lookup
         const issuesByNumber = new Map(issuesOnly.map(issue => [`${issue.repository.full_name}#${issue.number}`, issue]));
 
-        // Link PRs to issues (within the same repo)
         prsOnly.forEach(pr => {
           if (pr.body) {
             const regex = /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi;
@@ -240,13 +189,12 @@ function App() {
                   issue.linkedPRs = [];
                 }
                 issue.linkedPRs.push(pr);
-                linkedPrNumbers.add(pr.id); // Use ID because number might not be unique across repos
+                linkedPrNumbers.add(pr.id);
               }
             }
           }
         });
 
-        // Combine all issues and unlinked PRs
         issuesOnly.forEach(issue => finalIssues.push(issue));
         prsOnly.forEach(pr => {
           if (!linkedPrNumbers.has(pr.id)) {
@@ -255,15 +203,154 @@ function App() {
         });
 
         setIssues(finalIssues);
+        setLoading(false);
+
+        // --- Background Enrichment ---
+
+        const enrichItem = async (itemId: number, itemNumber: number, repoFullName: string, isJules: boolean, hasPR: boolean, initialHeadSha?: string) => {
+          let julesData: { status: string; url?: string } | undefined;
+          if (isJules && julesToken) {
+            julesData = await fetchJulesStatus(itemNumber, julesToken);
+          }
+
+          let prStatusData: PRStatus | undefined;
+          if (hasPR) {
+            try {
+              let sha = initialHeadSha;
+              if (!sha) {
+                const prResponse = await fetch(`https://api.github.com/repos/${repoFullName}/pulls/${itemNumber}`, { headers });
+                if (prResponse.ok) {
+                  const prDetail = await prResponse.json();
+                  sha = prDetail?.head?.sha;
+                }
+              }
+
+              if (sha) {
+                const checkRunsResponse = await fetch(
+                  `https://api.github.com/repos/${repoFullName}/commits/${sha}/check-runs`,
+                  { headers }
+                );
+                if (checkRunsResponse.ok) {
+                  const checkRunsData = await checkRunsResponse.json();
+                  let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
+
+                  if (checkRunsData?.total_count > 0 && Array.isArray(checkRunsData.check_runs)) {
+                    const checkRuns = checkRunsData.check_runs;
+                    const someFailed = checkRuns.some((run: any) =>
+                      ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
+                    );
+                    const someRunning = checkRuns.some((run: any) => run.status !== 'completed');
+
+                    if (someFailed) {
+                      color = 'red';
+                    } else if (someRunning) {
+                      color = 'yellow';
+                    } else {
+                      color = 'green';
+                    }
+                  }
+                  prStatusData = { color, label: 'Checks' };
+                }
+              }
+            } catch (err) {
+              console.error(`Failed to enrich PR #${itemNumber}`, err);
+            }
+          }
+
+          setIssues(prevIssues => prevIssues.map(issue => {
+            const updateObject = (target: IssueWithJulesStatus) => {
+              if (target.id !== itemId) return target;
+              const newTarget = { ...target };
+              if (isJules) {
+                newTarget.enrichingJules = false;
+                if (julesData) {
+                  newTarget.julesStatus = julesData.status;
+                  newTarget.julesUrl = julesData.url;
+                }
+              }
+              if (hasPR) {
+                newTarget.enrichingPR = false;
+                if (prStatusData) {
+                  newTarget.prStatus = prStatusData;
+                }
+              }
+              return newTarget;
+            };
+
+            const updatedIssue = updateObject(issue);
+            if (issue.linkedPRs) {
+              const newLinked = issue.linkedPRs.map(updateObject);
+              if (newLinked.some((l, idx) => l !== issue.linkedPRs![idx])) {
+                return { ...updatedIssue, linkedPRs: newLinked };
+              }
+            }
+            return updatedIssue;
+          }));
+        };
+
+        const enrichmentQueue: { itemId: number, itemNumber: number, repoFullName: string, isJules: boolean, hasPR: boolean, headSha?: string, priority: boolean }[] = [];
+        finalIssues.forEach((issue, index) => {
+          const priority = index < pageSize;
+          if (issue.enrichingJules || issue.enrichingPR) {
+            enrichmentQueue.push({
+              itemId: issue.id,
+              itemNumber: issue.number,
+              repoFullName: issue.repository.full_name,
+              isJules: !!issue.enrichingJules,
+              hasPR: !!issue.enrichingPR,
+              headSha: issue.headSha,
+              priority
+            });
+          }
+          if (issue.linkedPRs) {
+            issue.linkedPRs.forEach(lp => {
+              if (lp.enrichingJules || lp.enrichingPR) {
+                enrichmentQueue.push({
+                  itemId: lp.id,
+                  itemNumber: lp.number,
+                  repoFullName: lp.repository.full_name,
+                  isJules: !!lp.enrichingJules,
+                  hasPR: !!lp.enrichingPR,
+                  headSha: lp.headSha,
+                  priority
+                });
+              }
+            });
+          }
+        });
+
+        // Sort by priority (visible items first)
+        enrichmentQueue.sort((a, b) => (a.priority === b.priority ? 0 : a.priority ? -1 : 1));
+
+        const CONCURRENCY_LIMIT = 5;
+        let activeRequests = 0;
+        const remainingQueue = [...enrichmentQueue];
+
+        const processNext = async () => {
+          if (remainingQueue.length === 0) return;
+          while (activeRequests < CONCURRENCY_LIMIT && remainingQueue.length > 0) {
+            const task = remainingQueue.shift();
+            if (task) {
+              activeRequests++;
+              enrichItem(task.itemId, task.itemNumber, task.repoFullName, task.isJules, task.hasPR, task.headSha)
+                .finally(() => {
+                  activeRequests--;
+                  processNext();
+                });
+            }
+          }
+        };
+
+        processNext();
+
       } catch (err) {
         setError(err instanceof Error ? err.message : 'An unknown error occurred');
-      } finally {
         setLoading(false);
       }
     };
 
-    fetchIssues();
-  }, [ghToken, julesToken, currentRepo, filterState, refreshTrigger]);
+    fetchIssuesAndEnrich();
+  }, [ghToken, julesToken, currentRepo, filterState, refreshTrigger, pageSize]);
 
   const handleRepoChange = (newRepo: string) => {
     if (!newRepo) return;
@@ -412,7 +499,9 @@ function App() {
                     </td>
                     <td data-label="PR">
                       <div className="pr-status-group">
-                        {issue.prStatus && (
+                        {issue.enrichingPR ? (
+                          <span className="loading-dots">...</span>
+                        ) : issue.prStatus ? (
                           <div className="pr-status-container">
                             <svg
                               className={`pr-icon pr-icon-${issue.prStatus.color}`}
@@ -431,37 +520,43 @@ function App() {
                               {issue.prStatus.label}
                             </span>
                           </div>
-                        )}
+                        ) : null}
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
-                          pr.prStatus && (
-                            <div key={pr.id} className="pr-status-container subtitle">
-                              <svg
-                                className={`pr-icon pr-icon-${pr.prStatus.color}`}
-                                viewBox="0 0 16 16"
-                                version="1.1"
-                                width="16"
-                                height="16"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M7.177 3.03a.75.75 0 11-1.354-.645 2.75 2.75 0 015.162 1.377 2.25 2.25 0 01-.89 4.113 2.25 2.25 0 011.655 2.175v.25a2.25 2.25 0 11-4.5 0v-.25c0-.97.615-1.798 1.48-2.122a2.75 2.75 0 00-1.553-4.898zM9 10.25a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z"
-                                ></path>
-                              </svg>
-                              <span className={`pr-label pr-label-${pr.prStatus.color}`}>
-                                {pr.prStatus.label}
-                              </span>
-                            </div>
-                          )
+                          <div key={pr.id} className="subtitle">
+                            {pr.enrichingPR ? (
+                              <span className="loading-dots">...</span>
+                            ) : pr.prStatus ? (
+                              <div className="pr-status-container">
+                                <svg
+                                  className={`pr-icon pr-icon-${pr.prStatus.color}`}
+                                  viewBox="0 0 16 16"
+                                  version="1.1"
+                                  width="16"
+                                  height="16"
+                                  aria-hidden="true"
+                                >
+                                  <path
+                                    fillRule="evenodd"
+                                    d="M7.177 3.03a.75.75 0 11-1.354-.645 2.75 2.75 0 015.162 1.377 2.25 2.25 0 01-.89 4.113 2.25 2.25 0 011.655 2.175v.25a2.25 2.25 0 11-4.5 0v-.25c0-.97.615-1.798 1.48-2.122a2.75 2.75 0 00-1.553-4.898zM9 10.25a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z"
+                                  ></path>
+                                </svg>
+                                <span className={`pr-label pr-label-${pr.prStatus.color}`}>
+                                  {pr.prStatus.label}
+                                </span>
+                              </div>
+                            ) : null}
+                          </div>
                         ))}
-                        {!issue.prStatus && (!issue.linkedPRs || issue.linkedPRs.length === 0) && (
+                        {!issue.enrichingPR && !issue.prStatus && (!issue.linkedPRs || issue.linkedPRs.every(pr => !pr.enrichingPR && !pr.prStatus)) && (
                           <span className="text-muted">-</span>
                         )}
                       </div>
                     </td>
                     <td data-label="Jules">
                       <div className="jules-status-group">
-                        {issue.julesStatus ? (
+                        {issue.enrichingJules ? (
+                          <span className="loading-dots">...</span>
+                        ) : issue.julesStatus ? (
                           issue.julesUrl ? (
                             <a href={issue.julesUrl} target="_blank" rel="noopener noreferrer">
                               <span className={`badge jules-status-${issue.julesStatus.toLowerCase()}`}>
@@ -476,16 +571,14 @@ function App() {
                         ) : (
                           issue.isJules && !julesToken ? (
                             <span className="text-muted">Token Required</span>
-                          ) : (
-                            (!issue.linkedPRs || issue.linkedPRs.every(pr => !pr.julesStatus)) && (
-                              <span className="text-muted">-</span>
-                            )
-                          )
+                          ) : null
                         )}
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
-                          pr.julesStatus && (
-                            <div key={pr.id} className="subtitle">
-                              {pr.julesUrl ? (
+                          <div key={pr.id} className="subtitle">
+                            {pr.enrichingJules ? (
+                              <span className="loading-dots">...</span>
+                            ) : pr.julesStatus ? (
+                              pr.julesUrl ? (
                                 <a href={pr.julesUrl} target="_blank" rel="noopener noreferrer">
                                   <span className={`badge jules-status-${pr.julesStatus.toLowerCase()}`}>
                                     {pr.julesStatus}
@@ -495,10 +588,13 @@ function App() {
                                 <span className={`badge jules-status-${pr.julesStatus.toLowerCase()}`}>
                                   {pr.julesStatus}
                                 </span>
-                              )}
-                            </div>
-                          )
+                              )
+                            ) : null}
+                          </div>
                         ))}
+                        {!issue.enrichingJules && !issue.julesStatus && (!issue.linkedPRs || issue.linkedPRs.every(pr => !pr.enrichingJules && !pr.julesStatus)) && (
+                          <span className="text-muted">-</span>
+                        )}
                       </div>
                     </td>
                   </tr>
