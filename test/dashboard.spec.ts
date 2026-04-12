@@ -39,19 +39,29 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
     });
   });
 
-  // Mock Jules API for Issue 101
-  await page.route('**/v1alpha/sessions?filter=prompt%20:%20%22%23101%22', async (route) => {
+  // Mock GitHub Comments API for Issue 101
+  await page.route('**/repos/chatelao/AI-Dashboard/issues/101/comments*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([
+        {
+          user: { login: 'google-labs-jules[bot]' },
+          body: 'Jules is on it. View progress at https://jules.google.com/session/123'
+        }
+      ])
+    });
+  });
+
+  // Mock Jules API for Session 123
+  await page.route('**/v1alpha/session/123', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
       body: JSON.stringify({
-        sessions: [
-          {
-            name: 'sessions/123',
-            state: 'STATE_CODING',
-            url: 'https://jules.google.com/session/123'
-          }
-        ]
+        name: 'sessions/123',
+        state: 'STATE_CODING',
+        url: 'https://jules.google.com/session/123'
       })
     });
   });

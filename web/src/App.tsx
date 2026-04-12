@@ -107,16 +107,56 @@ function App() {
     return results.flat();
   };
 
-  const fetchJulesStatus = async (issueId: number, token: string): Promise<{ status: string; url?: string } | undefined> => {
+  const extractSessionId = (text: string): string | undefined => {
+    // Try to find common patterns for session/task IDs in Jules comments
+    // 1. Markdown links like [Jules Task](.../sessions/ID) or .../session/ID or .../task/ID
+    const urlRegex = /jules\.google\.com\/(?:session|sessions|task)\/([a-zA-Z0-9_-]+)/;
+    const urlMatch = text.match(urlRegex);
+    if (urlMatch) return urlMatch[1];
+
+    // 2. Explicit task_id or session_id labels
+    const labelRegex = /(?:task_id|session_id|sessionId|taskId)[:=]\s*([a-zA-Z0-9_-]+)/i;
+    const labelMatch = text.match(labelRegex);
+    if (labelMatch) return labelMatch[1];
+
+    // 3. Look for a long numeric ID that looks like a session ID
+    const longIdRegex = /\b(\d{15,25})\b/;
+    const longIdMatch = text.match(longIdRegex);
+    if (longIdMatch) return longIdMatch[1];
+
+    return undefined;
+  };
+
+  const fetchSessionIdFromComments = async (repo: string, issueNumber: number, headers: HeadersInit): Promise<string | undefined> => {
+    try {
+      const response = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/comments?per_page=100`, { headers });
+      if (!response.ok) return undefined;
+      const comments: any[] = await response.json();
+
+      // Find the latest "on it" comment from Jules bot
+      const julesComments = comments.filter(c =>
+        (c.user?.login?.toLowerCase() === 'google-labs-jules[bot]' || c.user?.login?.toLowerCase() === 'jules') &&
+        c.body?.toLowerCase().includes('on it')
+      ).reverse();
+
+      for (const comment of julesComments) {
+        const sessionId = extractSessionId(comment.body);
+        if (sessionId) return sessionId;
+      }
+    } catch (err) {
+      console.error(`Error fetching comments for ${repo}#${issueNumber}:`, err);
+    }
+    return undefined;
+  };
+
+  const fetchJulesStatus = async (sessionId: string, token: string): Promise<{ status: string; url?: string } | undefined> => {
     let url;
-    // v1alpha uses /sessions with a filter or direct session access.
-    // We'll search for sessions related to the issue.
-    // For now, we assume Jules API is queried for a session associated with the issue.
+    // Use the exact session endpoint as requested
     if (julesApiBase.includes('?url=')) {
-      const targetUrl = `https://jules.googleapis.com/v1alpha/sessions?filter=prompt%20:%20%22%23${issueId}%22`;
+      const targetUrl = `https://jules.googleapis.com/v1alpha/session/${sessionId}`;
       url = `${julesApiBase}${encodeURIComponent(targetUrl)}`;
     } else {
-      url = `${julesApiBase}/sessions?filter=prompt%20:%20%22%23${issueId}%22`;
+      url = `${julesApiBase}/session/${sessionId}`;
     }
     console.log(`Fetching Jules status from: ${url}`);
     try {
@@ -133,29 +173,25 @@ function App() {
       }
 
       const response = await fetch(url, { headers });
-      console.log(`Jules API response status for issue ${issueId}: ${response.status}`);
+      console.log(`Jules API response status for session ${sessionId}: ${response.status}`);
       if (!response.ok) {
         if (response.status === 404) {
-          console.warn(`Jules API returned 404 for issue ${issueId}. Check your Jules API Base URL in Settings. It must end with /v1alpha (e.g., https://jules.googleapis.com/v1alpha) and your proxy must forward the Authorization header.`);
+          console.warn(`Jules API returned 404 for session ${sessionId}. Check your Jules API Base URL in Settings. It must end with /v1alpha (e.g., https://jules.googleapis.com/v1alpha) and your proxy must forward the Authorization header.`);
         }
         return undefined;
       }
       const data: any = await response.json();
-      console.log(`Jules API response data for issue ${issueId}:`, data);
+      console.log(`Jules API response data for session ${sessionId}:`, data);
 
-      // Look for the session in the list
-      if (data && data.sessions && Array.isArray(data.sessions) && data.sessions.length > 0) {
-        const session = data.sessions[0];
-        if (session.state) {
-          return {
-            status: session.state.replace('STATE_', '').replace(/_/g, '-').toLowerCase(),
-            url: session.url
-          };
-        }
+      if (data && data.state) {
+        return {
+          status: data.state.replace('STATE_', '').replace(/_/g, '-').toLowerCase(),
+          url: data.url
+        };
       }
       return undefined;
     } catch (err) {
-      console.error(`Failed to fetch Jules status for issue ${issueId}:`, err);
+      console.error(`Failed to fetch Jules status for session ${sessionId}:`, err);
       return undefined;
     }
   };
@@ -399,10 +435,13 @@ function App() {
               if (target.pull_request && target.enrichingPR === undefined) target.enrichingPR = true;
 
               if (target.isJules && julesToken) {
-                const result = await fetchJulesStatus(target.number, julesToken);
-                if (result) {
-                  target.julesStatus = result.status;
-                  target.julesUrl = result.url;
+                const sessionId = await fetchSessionIdFromComments(target.repository.full_name, target.number, headers);
+                if (sessionId) {
+                  const result = await fetchJulesStatus(sessionId, julesToken);
+                  if (result) {
+                    target.julesStatus = result.status;
+                    target.julesUrl = result.url;
+                  }
                 }
                 target.enrichingJules = false;
                 updated = true;
