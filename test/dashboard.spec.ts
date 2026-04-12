@@ -54,7 +54,11 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
   await expect(table).toBeVisible();
 
   // Verify Issue 101 status and repo name
-  const row101 = page.locator('tr', { hasText: 'Jules issue' });
+  // Note: the table has 4 columns: Title, State, PR, Jules Status
+  // The Title column contains the repo name in brackets.
+  // We use filter with hasText to find the row containing the issue title or number if it was there,
+  // but since we want to be specific about the columns:
+  const row101 = page.locator('tr', { has: page.locator('text=Jules issue') });
   await expect(row101.locator('td').nth(0)).toContainText('[AI-Dashboard]');
   await expect(row101.locator('td').nth(3)).toContainText('Coding');
 });

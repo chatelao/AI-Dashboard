@@ -33,6 +33,7 @@ interface IssueWithJulesStatus extends GitHubIssue {
   julesUrl?: string;
   prStatus?: PRStatus;
   linkedPRs?: IssueWithJulesStatus[];
+  isJules?: boolean;
 }
 
 const JULES_API_BASE_URL = 'https://jules.googleapis.com/v1';
@@ -60,16 +61,20 @@ function App() {
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   const fetchJulesStatus = async (issueId: number, token: string): Promise<{ status: string; url?: string } | undefined> => {
+    const url = `${JULES_API_BASE_URL}/tasks/${issueId}/status`;
+    console.log(`Fetching Jules status from: ${url}`);
     try {
-      const response = await fetch(`${JULES_API_BASE_URL}/tasks/${issueId}/status`, {
+      const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
       });
+      console.log(`Jules API response status for issue ${issueId}: ${response.status}`);
       if (!response.ok) {
         return undefined;
       }
       const data: unknown = await response.json();
+      console.log(`Jules API response data for issue ${issueId}:`, data);
       if (data && typeof data === 'object' && 'status' in data && typeof data.status === 'string') {
         const result: { status: string; url?: string } = { status: data.status };
         if ('url' in data && typeof data.url === 'string') {
@@ -151,11 +156,16 @@ function App() {
             item.labels.some(l => l.name.toLowerCase() === 'jules')
           );
 
-          if (isJules && julesToken) {
-            const result = await fetchJulesStatus(item.number, julesToken);
-            if (result) {
-              updatedItem.julesStatus = result.status;
-              updatedItem.julesUrl = result.url;
+          if (isJules) {
+            updatedItem.isJules = true;
+            if (julesToken) {
+              const result = await fetchJulesStatus(item.number, julesToken);
+              if (result) {
+                updatedItem.julesStatus = result.status;
+                updatedItem.julesUrl = result.url;
+              }
+            } else {
+              console.log(`Issue #${item.number} is a Jules task but julesToken is missing.`);
             }
           }
 
@@ -464,8 +474,12 @@ function App() {
                             </span>
                           )
                         ) : (
-                          (!issue.linkedPRs || issue.linkedPRs.every(pr => !pr.julesStatus)) && (
-                            <span className="text-muted">-</span>
+                          issue.isJules && !julesToken ? (
+                            <span className="text-muted">Token Required</span>
+                          ) : (
+                            (!issue.linkedPRs || issue.linkedPRs.every(pr => !pr.julesStatus)) && (
+                              <span className="text-muted">-</span>
+                            )
                           )
                         )}
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
