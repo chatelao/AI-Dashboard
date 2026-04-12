@@ -23,6 +23,19 @@ If you have a standard webhosting account with PHP support, you can use this sim
  * Simple CORS Proxy for Jules API
  */
 
+// Polyfill for getallheaders if not available
+if (!function_exists('getallheaders')) {
+    function getallheaders() {
+        $headers = [];
+        foreach ($_SERVER as $name => $value) {
+            if (substr($name, 0, 5) == 'HTTP_') {
+                $headers[str_replace(' ', '-', ucwords(strtolower(str_replace('_', ' ', substr($name, 5)))))] = $value;
+            }
+        }
+        return $headers;
+    }
+}
+
 // 1. Handle CORS Preflight
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
     header("Access-Control-Allow-Origin: *");
@@ -42,6 +55,12 @@ if (empty($path) && isset($_SERVER['REQUEST_URI'])) {
         $path = substr($requestUri, strlen($scriptName));
     }
 }
+
+// Auto-fix: Ensure path starts with /v1 if it looks like a task status request
+if (!empty($path) && strpos($path, '/v1/') !== 0 && strpos($path, '/tasks/') === 0) {
+    $path = '/v1' . $path;
+}
+
 $targetUrl = 'https://jules.googleapis.com' . $path;
 
 // 3. Forward the request using cURL
@@ -81,6 +100,16 @@ echo $response;
     - Open the dashboard **Settings** (⚙️ icon).
     - Update the **Jules API Base URL** to your proxy URL (e.g., `https://your-domain.com/proxy.php/v1`).
     - Click **Save & Reload**.
+
+---
+
+## Troubleshooting 404 Errors
+
+If you see 404 errors in the console while using the proxy, check the following:
+
+1.  **Missing `/v1`:** Ensure your Jules API Base URL in settings ends with `/v1`. The proxy script above has an auto-fix for this, but it's best to include it.
+2.  **Incorrect Path:** The dashboard appends `/tasks/{id}/status` to the Base URL. If your Base URL is `https://example.com/proxy.php`, the request becomes `https://example.com/proxy.php/tasks/...`.
+3.  **Proxy Configuration:** Ensure `PATH_INFO` is supported by your web server. If not, the fallback logic in the script should handle it, but you may need to check your server logs.
 
 ---
 

@@ -115,6 +115,9 @@ function App() {
       });
       console.log(`Jules API response status for issue ${issueId}: ${response.status}`);
       if (!response.ok) {
+        if (response.status === 404) {
+          console.warn(`Jules API returned 404 for issue ${issueId}. If using a proxy, ensure the Base URL includes '/v1' and the proxy is correctly configured.`);
+        }
         return undefined;
       }
       const data: unknown = await response.json();
