@@ -382,8 +382,8 @@ a:hover {
     border: none;
     border-bottom: 1px solid #333;
     position: relative;
-    padding: 12px 10px 12px 40% !important;
-    text-align: right;
+    padding: 12px 10px !important;
+    text-align: left;
     min-height: 2.5rem;
     font-size: 0.9rem;
     word-break: break-word;
@@ -394,26 +394,16 @@ a:hover {
   }
 
   td::before {
-    content: attr(data-label);
-    position: absolute;
-    left: 10px;
-    width: 35%;
-    padding-right: 10px;
-    white-space: nowrap;
-    text-align: left;
-    font-weight: 600;
-    font-size: 0.75rem;
-    color: #aaa;
-    text-transform: uppercase;
+    display: none;
   }
 
   .title-container {
-    text-align: right;
+    text-align: left;
   }
 
   .pr-status-group,
   .jules-status-group {
-    align-items: flex-end;
+    align-items: flex-start;
   }
 
   .badge {
