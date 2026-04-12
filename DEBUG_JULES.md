@@ -29,7 +29,7 @@ The application logs its progress:
 **Common Error Indicators:**
 - **401 Unauthorized:**
   - Your `jules_token` is invalid or expired.
-  - **OR** your CORS proxy is not receiving the `Authorization` header. Many web servers (like Apache) strip this header by default. See [CORS_PROXY.md](CORS_PROXY.md#troubleshooting-the-authorization-header) for how to fix this using `.htaccess`.
+  - **OR** your CORS proxy is not receiving the `Authorization` header. Many web servers (like Apache) strip this header by default. The dashboard automatically sends an `X-Authorization` header as a fallback. If you are using the proxy from [CORS_PROXY.md](CORS_PROXY.md), ensure you have updated it to the latest version that supports this fallback. See [CORS_PROXY.md](CORS_PROXY.md#troubleshooting-the-authorization-header) for more details.
 - **404 Not Found:** This can happen for several reasons:
   - The Jules API does not have a task corresponding to that GitHub issue number.
   - The **Jules API Base URL** in Settings is incorrect. It **must** include the `/v1` suffix (e.g., `https://jules.googleapis.com/v1`).

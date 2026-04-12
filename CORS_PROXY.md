@@ -47,6 +47,10 @@ function getallheaders_robust() {
             $headers['Authorization'] = $_SERVER['HTTP_AUTHORIZATION'];
         } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
             $headers['Authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+        } elseif (isset($headers['X-Authorization'])) {
+            $headers['Authorization'] = $headers['X-Authorization'];
+        } elseif (isset($_SERVER['HTTP_X_AUTHORIZATION'])) {
+            $headers['Authorization'] = $_SERVER['HTTP_X_AUTHORIZATION'];
         }
     }
     return $headers;
@@ -95,13 +99,13 @@ if (isset($_GET['url'])) {
 $headers = array_change_key_case(getallheaders_robust(), CASE_LOWER);
 
 // DIAGNOSTIC: Check for Authorization header if calling Jules API
-if (!isset($headers['authorization']) && strpos($targetUrl, 'https://jules.googleapis.com/') === 0) {
+if (!isset($headers['authorization']) && !isset($headers['x-authorization']) && strpos($targetUrl, 'https://jules.googleapis.com/') === 0) {
     header("Access-Control-Allow-Origin: *");
     header("Content-Type: application/json");
     http_response_code(401);
     echo json_encode([
         "error" => "Missing Authorization header",
-        "message" => "The proxy did not receive an Authorization header. If you are using Apache, you may need to add 'SetEnvIf Authorization \"(.*)\" HTTP_AUTHORIZATION=$1' to your .htaccess file. See CORS_PROXY.md for details."
+        "message" => "The proxy did not receive an Authorization or X-Authorization header. If you are using Apache, you may need to add 'SetEnvIf Authorization \"(.*)\" HTTP_AUTHORIZATION=$1' to your .htaccess file. See CORS_PROXY.md for details."
     ]);
     exit;
 }
@@ -162,7 +166,9 @@ echo $response;
 
 ### Troubleshooting the Authorization Header
 
-On many Apache and PHP-FPM installations, the `Authorization` header is stripped before it reaches your PHP script. If the proxy returns a `401 Missing Authorization header` error despite you having configured it in the dashboard, try the following:
+On many Apache and PHP-FPM installations, the `Authorization` header is stripped before it reaches your PHP script. The dashboard automatically sends an `X-Authorization` header as a fallback, which the provided proxy script is designed to handle.
+
+If the proxy still returns a `401 Missing Authorization header` error despite you having configured it in the dashboard, try the following:
 
 #### Apache (.htaccess)
 
