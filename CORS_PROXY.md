@@ -126,6 +126,7 @@ $ch = curl_init($targetUrl);
 curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
 curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
 curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $_SERVER['REQUEST_METHOD']);
+curl_setopt($ch, CURLOPT_ENCODING, ''); // Handle compressed responses
 
 // Forward headers (excluding Host and browser-specific headers that might cause issues)
 $curlHeaders = [];
