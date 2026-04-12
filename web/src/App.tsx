@@ -345,7 +345,9 @@ function App() {
               onChange={(e) => setDraftJulesApiBase(e.target.value)}
               placeholder="https://jules.googleapis.com/v1"
             />
-            <small className="help-text">Use this to configure a CORS proxy if needed.</small>
+            <small className="help-text">
+              Use this to configure a CORS proxy if needed. See <a href="https://github.com/chatelao/AI-Dashboard/blob/main/CORS_PROXY.md" target="_blank" rel="noopener noreferrer">CORS_PROXY.md</a> for instructions.
+            </small>
           </div>
           <div className="settings-actions">
             <button className="btn-save" onClick={handleSaveSettings}>Save & Reload</button>

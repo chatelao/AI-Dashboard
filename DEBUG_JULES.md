@@ -29,9 +29,14 @@ The application logs its progress:
 **Common Error Indicators:**
 - **401 Unauthorized:** Your `jules_token` is invalid or expired.
 - **404 Not Found:** The Jules API does not have a task corresponding to that GitHub issue number.
-- **CORS Errors:** If you see "Access-Control-Allow-Origin" errors, the Jules API might not be configured to allow requests from your current domain (e.g., `localhost` or `github.io`).
+- **CORS Errors:** If you see "Access-Control-Allow-Origin" errors, the Jules API might not be configured to allow requests from your current domain (e.g., `localhost` or `github.io`). See [Resolving CORS Errors](#resolving-cors-errors) below.
 
-## 4. Test API with `curl`
+## 4. Resolving CORS Errors
+When running the dashboard in a browser, you may need a CORS proxy to access the Jules API.
+
+For detailed instructions on how to set up and configure a CORS proxy, see [CORS_PROXY.md](CORS_PROXY.md).
+
+## 5. Test API with `curl`
 You can verify the API and your token independently of the dashboard using `curl`:
 
 ```bash
@@ -50,7 +55,7 @@ Replace `YOUR_JULES_TOKEN` with your actual token and `YOUR_ISSUE_NUMBER` with t
 ```
 *Note: The API also supports `task_url` instead of `url`.*
 
-## 5. Verify Issue Number Logic
+## 6. Verify Issue Number Logic
 The dashboard uses the repository-specific GitHub issue `number` (e.g., `#55`) as the `issueId` for the Jules API, NOT the global GitHub database `id`.
 
 In `web/src/App.tsx`:
