@@ -105,7 +105,13 @@ function App() {
   };
 
   const fetchJulesStatus = async (issueId: number, token: string): Promise<{ status: string; url?: string } | undefined> => {
-    const url = `${julesApiBase}/tasks/${issueId}/status`;
+    let url;
+    if (julesApiBase.includes('?url=')) {
+      const targetUrl = `https://jules.googleapis.com/v1/tasks/${issueId}/status`;
+      url = `${julesApiBase}${encodeURIComponent(targetUrl)}`;
+    } else {
+      url = `${julesApiBase}/tasks/${issueId}/status`;
+    }
     console.log(`Fetching Jules status from: ${url}`);
     try {
       const response = await fetch(url, {
