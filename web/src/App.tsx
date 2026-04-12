@@ -37,6 +37,9 @@ interface IssueWithJulesStatus extends GitHubIssue {
   isJules?: boolean;
   enrichingJules?: boolean;
   enrichingPR?: boolean;
+  mergeable?: boolean | null;
+  mergeable_state?: string;
+  actionLoading?: boolean;
 }
 
 const DEFAULT_JULES_API_BASE = 'https://jules.googleapis.com/v1';
@@ -155,6 +158,72 @@ function App() {
     setRefreshTrigger(prev => prev + 1);
   };
 
+  const updateActionLoading = (prId: number, loading: boolean) => {
+    setIssues(prev => prev.map(issue => {
+      if (issue.id === prId) {
+        return { ...issue, actionLoading: loading };
+      }
+      if (issue.linkedPRs) {
+        return {
+          ...issue,
+          linkedPRs: issue.linkedPRs.map(pr =>
+            pr.id === prId ? { ...pr, actionLoading: loading } : pr
+          )
+        };
+      }
+      return issue;
+    }));
+  };
+
+  const handleUpdateBranch = async (repo: string, pullNumber: number, prId: number) => {
+    updateActionLoading(prId, true);
+    try {
+      const response = await fetch(`https://api.github.com/repos/${repo}/pulls/${pullNumber}/update-branch`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${ghToken}`,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28'
+        }
+      });
+      if (response.ok) {
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        const data = await response.json();
+        alert(`Failed to update branch: ${data.message || response.statusText}`);
+      }
+    } catch (err) {
+      alert(`Error updating branch: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      updateActionLoading(prId, false);
+    }
+  };
+
+  const handleMergePR = async (repo: string, pullNumber: number, prId: number) => {
+    if (!confirm(`Are you sure you want to merge PR #${pullNumber} in ${repo}?`)) return;
+    updateActionLoading(prId, true);
+    try {
+      const response = await fetch(`https://api.github.com/repos/${repo}/pulls/${pullNumber}/merge`, {
+        method: 'PUT',
+        headers: {
+          'Authorization': `token ${ghToken}`,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28'
+        }
+      });
+      if (response.ok) {
+        setRefreshTrigger(prev => prev + 1);
+      } else {
+        const data = await response.json();
+        alert(`Failed to merge PR: ${data.message || response.statusText}`);
+      }
+    } catch (err) {
+      alert(`Error merging PR: ${err instanceof Error ? err.message : String(err)}`);
+    } finally {
+      updateActionLoading(prId, false);
+    }
+  };
+
   const handleClearSettings = () => {
     localStorage.removeItem('github_token');
     localStorage.removeItem('jules_token');
@@ -248,11 +317,6 @@ function App() {
         });
 
         issuesOnly.forEach(issue => finalIssues.push(issue as IssueWithJulesStatus));
-        prsOnly.forEach(pr => {
-          if (!linkedPrNumbers.has(pr.id)) {
-            finalIssues.push(pr as IssueWithJulesStatus);
-          }
-        });
 
         // Sort by updated_at descending
         finalIssues.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
@@ -320,47 +384,50 @@ function App() {
 
               if (target.pull_request) {
                 try {
-                  const prKey = `${target.repository.full_name}#${target.number}`;
-                  let sha = prMetadataMap.get(prKey);
-
-                  if (!sha) {
-                    const prResponse = await fetch(target.pull_request.url, { headers });
-                    if (prResponse.ok) {
-                      const prDetail: any = await prResponse.json();
-                      sha = prDetail?.head?.sha;
+                  const prResponse = await fetch(target.pull_request.url, {
+                    headers: {
+                      ...headers,
+                      'Accept': 'application/vnd.github+json',
+                      'X-GitHub-Api-Version': '2022-11-28'
                     }
-                  }
+                  });
+                  if (prResponse.ok) {
+                    const prDetail: any = await prResponse.json();
+                    target.mergeable = prDetail.mergeable;
+                    target.mergeable_state = prDetail.mergeable_state;
+                    const sha = prDetail?.head?.sha;
 
-                  if (sha) {
-                    const checkRunsResponse = await fetch(
-                      `https://api.github.com/repos/${target.repository.full_name}/commits/${sha}/check-runs`,
-                      { headers }
-                    );
-                    if (checkRunsResponse.ok) {
-                      const checkRunsData: any = await checkRunsResponse.json();
-                      let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
-                      let label = 'Create';
+                    if (sha) {
+                      const checkRunsResponse = await fetch(
+                        `https://api.github.com/repos/${target.repository.full_name}/commits/${sha}/check-runs`,
+                        { headers }
+                      );
+                      if (checkRunsResponse.ok) {
+                        const checkRunsData: any = await checkRunsResponse.json();
+                        let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
+                        let label = 'Create';
 
-                      if (checkRunsData?.total_count > 0 && Array.isArray(checkRunsData.check_runs)) {
-                        const checkRuns = checkRunsData.check_runs;
-                        const someFailed = checkRuns.some((run: any) =>
-                          ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
-                        );
-                        const someRunning = checkRuns.some((run: any) => run.status !== 'completed');
-                        const completedCount = checkRuns.filter((run: any) => run.status === 'completed').length;
+                        if (checkRunsData?.total_count > 0 && Array.isArray(checkRunsData.check_runs)) {
+                          const checkRuns = checkRunsData.check_runs;
+                          const someFailed = checkRuns.some((run: any) =>
+                            ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
+                          );
+                          const someRunning = checkRuns.some((run: any) => run.status !== 'completed');
+                          const completedCount = checkRuns.filter((run: any) => run.status === 'completed').length;
 
-                        if (someFailed) color = 'red';
-                        else if (someRunning) color = 'yellow';
-                        else color = 'green';
+                          if (someFailed) color = 'red';
+                          else if (someRunning) color = 'yellow';
+                          else color = 'green';
 
-                        label = `${completedCount}/${checkRuns.length}`;
+                          label = `${completedCount}/${checkRuns.length}`;
+                        }
+
+                        target.prStatus = { color, label };
                       }
-
-                      target.prStatus = { color, label };
                     }
                   }
                 } catch (err) {
-                  console.error(`Failed to fetch check runs for PR #${target.number}`, err);
+                  console.error(`Failed to enrich PR #${target.number}`, err);
                 }
                 target.enrichingPR = false;
                 updated = true;
@@ -542,6 +609,24 @@ function App() {
                             <span className={`pr-label pr-label-${issue.prStatus.color}`}>
                               {issue.prStatus.label}
                             </span>
+                            {ghToken && issue.mergeable_state === 'behind' && (
+                              <button
+                                className="btn-action btn-update"
+                                onClick={() => handleUpdateBranch(issue.repository.full_name, issue.number, issue.id)}
+                                disabled={issue.actionLoading}
+                              >
+                                {issue.actionLoading ? '...' : 'Update'}
+                              </button>
+                            )}
+                            {ghToken && (issue.mergeable_state === 'clean' || issue.mergeable_state === 'unstable') && (
+                              <button
+                                className="btn-action btn-merge"
+                                onClick={() => handleMergePR(issue.repository.full_name, issue.number, issue.id)}
+                                disabled={issue.actionLoading}
+                              >
+                                {issue.actionLoading ? '...' : 'Merge'}
+                              </button>
+                            )}
                           </div>
                         )}
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
@@ -567,6 +652,24 @@ function App() {
                               <span className={`pr-label pr-label-${pr.prStatus.color}`}>
                                 {pr.prStatus.label}
                               </span>
+                              {ghToken && pr.mergeable_state === 'behind' && (
+                                <button
+                                  className="btn-action btn-update"
+                                  onClick={() => handleUpdateBranch(pr.repository.full_name, pr.number, pr.id)}
+                                  disabled={pr.actionLoading}
+                                >
+                                  {pr.actionLoading ? '...' : 'Update'}
+                                </button>
+                              )}
+                              {ghToken && (pr.mergeable_state === 'clean' || pr.mergeable_state === 'unstable') && (
+                                <button
+                                  className="btn-action btn-merge"
+                                  onClick={() => handleMergePR(pr.repository.full_name, pr.number, pr.id)}
+                                  disabled={pr.actionLoading}
+                                >
+                                  {pr.actionLoading ? '...' : 'Merge'}
+                                </button>
+                              )}
                             </div>
                           )
                         ))}
