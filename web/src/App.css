@@ -284,6 +284,22 @@ a:hover {
   text-align: left;
 }
 
+.repo-tag {
+  font-size: 0.75rem;
+  background-color: rgba(139, 148, 158, 0.15);
+  color: #8b949e;
+  padding: 2px 6px;
+  border-radius: 4px;
+  margin-right: 6px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.pr-number {
+  color: #58a6ff;
+  font-weight: 600;
+}
+
 .subtitle {
   font-size: 0.85rem;
   opacity: 0.8;
@@ -369,18 +385,15 @@ a:hover {
   }
 
   tr {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    grid-template-areas:
-      "title title title"
-      "state pr jules";
+    display: flex;
+    flex-wrap: wrap;
     background-color: #1a1a1a;
     border-radius: 12px;
     margin-bottom: 1rem;
     padding: 1rem;
     box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
     border: 1px solid #333;
-    gap: 0.5rem;
+    gap: 1rem 1.5rem;
   }
 
   td {
@@ -390,28 +403,38 @@ a:hover {
     padding: 0 !important;
     text-align: left;
     min-height: auto;
-    font-size: 0.9rem;
+    font-size: 0.95rem;
     word-break: break-word;
   }
 
   td[data-label="Title"] {
-    grid-area: title;
+    flex: 0 0 100%;
     margin-bottom: 0.5rem;
     border-bottom: 1px solid #333;
-    padding-bottom: 0.75rem !important;
+    padding-bottom: 1rem !important;
   }
 
-  td[data-label="State"] { grid-area: state; }
-  td[data-label="PR"] { grid-area: pr; }
-  td[data-label="Jules"] { grid-area: jules; }
+  .repo-tag {
+    display: block;
+    width: fit-content;
+    margin-bottom: 6px;
+    margin-right: 0;
+  }
+
+  td[data-label="State"],
+  td[data-label="PR"],
+  td[data-label="Jules"] {
+    flex: 0 0 auto;
+    min-width: 70px;
+  }
 
   td::before {
     display: block;
     content: attr(data-label);
-    font-size: 0.65rem;
+    font-size: 0.7rem;
     text-transform: uppercase;
     color: #8b949e;
-    margin-bottom: 4px;
+    margin-bottom: 6px;
     font-weight: 600;
     letter-spacing: 0.05em;
   }
