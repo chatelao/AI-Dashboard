@@ -119,6 +119,7 @@ function App() {
     try {
       const response = await fetch(url, {
         headers: {
+          'Accept': 'application/json',
           'Authorization': `Bearer ${token}`,
           'X-Authorization': `Bearer ${token}`,
           'X-Goog-Api-Key': token

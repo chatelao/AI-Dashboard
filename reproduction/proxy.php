@@ -1,4 +1,8 @@
 <?php
+/**
+ * Reproduction Proxy for Jules API Debugging
+ */
+
 if (!function_exists('getallheaders')) {
     function getallheaders() {
         $headers = [];
@@ -10,17 +14,40 @@ if (!function_exists('getallheaders')) {
         return $headers;
     }
 }
+
 function getallheaders_robust() {
-    $headers = getallheaders();
-    if (!isset($headers['Authorization'])) {
+    $headers = array_change_key_case(getallheaders(), CASE_LOWER);
+    if (!isset($headers['authorization'])) {
         if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-            $headers['Authorization'] = $_SERVER['HTTP_AUTHORIZATION'];
+            $headers['authorization'] = $_SERVER['HTTP_AUTHORIZATION'];
         } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-            $headers['Authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+            $headers['authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+        } elseif (isset($headers['x-authorization'])) {
+            $headers['authorization'] = $headers['x-authorization'];
+        } elseif (isset($_SERVER['HTTP_X_AUTHORIZATION'])) {
+            $headers['authorization'] = $_SERVER['HTTP_X_AUTHORIZATION'];
         }
+    }
+    if (!isset($headers['x-goog-api-key']) && isset($_SERVER['HTTP_X_GOOG_API_KEY'])) {
+        $headers['x-goog-api-key'] = $_SERVER['HTTP_X_GOOG_API_KEY'];
     }
     return $headers;
 }
+
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
+if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
+    header("Access-Control-Allow-Origin: $origin");
+    header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
+    header("Access-Control-Allow-Headers: *");
+    header("Access-Control-Allow-Credentials: true");
+    exit;
+}
+
 $headers = getallheaders_robust();
+header("Access-Control-Allow-Origin: $origin");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
+header("Access-Control-Allow-Headers: *");
+header("Access-Control-Allow-Credentials: true");
 header('Content-Type: application/json');
+
 echo json_encode(['headers' => $headers, 'server' => $_SERVER]);
