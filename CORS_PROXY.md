@@ -92,8 +92,10 @@ if (isset($_GET['url'])) {
         }
     }
 
-    // Auto-prepend /v1 if missing and not empty
-    if (!empty($path) && strpos($path, '/v1/') !== 0 && $path !== '/v1') {
+    // Auto-prepend /v1 if missing and not already v1 or v1alpha
+    if (!empty($path) &&
+        strpos($path, '/v1/') !== 0 && $path !== '/v1' &&
+        strpos($path, '/v1alpha/') !== 0 && $path !== '/v1alpha') {
         $path = '/v1' . $path;
     }
 
@@ -101,12 +103,12 @@ if (isset($_GET['url'])) {
 }
 
 // 3. Forward the request using cURL
-$headers = getallheaders_robust();
+$receivedHeaders = getallheaders_robust();
 
 // DIAGNOSTIC: Check for authentication headers if calling Jules API
-$hasAuth = isset($headers['authorization']) ||
-           isset($headers['x-authorization']) ||
-           isset($headers['x-goog-api-key']);
+$hasAuth = isset($receivedHeaders['authorization']) ||
+           isset($receivedHeaders['x-authorization']) ||
+           isset($receivedHeaders['x-goog-api-key']);
 
 if (!$hasAuth && strpos($targetUrl, 'https://jules.googleapis.com/') === 0) {
     header("Access-Control-Allow-Origin: $origin");
@@ -127,8 +129,8 @@ curl_setopt($ch, CURLOPT_CUSTOMREQUEST, $_SERVER['REQUEST_METHOD']);
 
 // Forward headers (excluding Host and browser-specific headers that might cause issues)
 $curlHeaders = [];
-$excludedHeaders = ['host', 'origin', 'referer'];
-foreach ($headers as $key => $value) {
+$excludedHeaders = ['host', 'origin', 'referer', 'x-authorization'];
+foreach ($receivedHeaders as $key => $value) {
     if (!in_array($key, $excludedHeaders) && strpos($key, 'sec-') !== 0) {
         // Normalize common headers for better compatibility
         $normalizedKey = str_replace(' ', '-', ucwords(str_replace('-', ' ', $key)));
