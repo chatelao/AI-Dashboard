@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 
 interface GitHubIssue {
@@ -61,6 +61,19 @@ function App() {
     return saved ? JSON.parse(saved) : ['chatelao/AI-Dashboard'];
   });
   const [draftRepoHistory, setDraftRepoHistory] = useState<string>(repoHistory.join(', '));
+
+  const [searchTerm, setSearchTerm] = useState<string>('');
+  const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('');
+
+  const allConsolidatedIssuesRef = useRef<IssueWithJulesStatus[]>([]);
+  const lastFetchKeyRef = useRef<string>('');
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setDebouncedSearchTerm(searchTerm);
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
 
   useEffect(() => {
     if (showSettings) {
@@ -304,87 +317,111 @@ function App() {
           headers['Authorization'] = `token ${ghToken}`;
         }
 
-        let effectiveRepoList = [...repoHistory];
-        if (effectiveRepoList.length === 0 && ghToken) {
-          try {
-            const response = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100', { headers });
-            if (response.ok) {
-              const repos: any[] = await response.json();
-              effectiveRepoList = repos.map(r => r.full_name);
+        const fetchKey = JSON.stringify([ghToken, repoHistory, filterState, refreshTrigger]);
+        let finalIssues: IssueWithJulesStatus[] = [];
+
+        if (fetchKey === lastFetchKeyRef.current && lastFetchKeyRef.current !== '') {
+          finalIssues = [...allConsolidatedIssuesRef.current];
+        } else {
+          let effectiveRepoList = [...repoHistory];
+          if (effectiveRepoList.length === 0 && ghToken) {
+            try {
+              const response = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100', { headers });
+              if (response.ok) {
+                const repos: any[] = await response.json();
+                effectiveRepoList = repos.map(r => r.full_name);
+              }
+            } catch (err) {
+              console.error('Failed to fetch user repositories', err);
             }
-          } catch (err) {
-            console.error('Failed to fetch user repositories', err);
           }
-        }
 
-        const allReposResults = await Promise.all(
-          effectiveRepoList.map(repo => fetchRawIssues(repo, filterState, headers))
-        );
+          const allReposResults = await Promise.all(
+            effectiveRepoList.map(repo => fetchRawIssues(repo, filterState, headers))
+          );
 
-        const filteredReposResults = allReposResults.map(repoIssues => {
-          const openIssues = repoIssues.filter(i => i.state === 'open');
-          const closedIssues = repoIssues
-            .filter(i => i.state === 'closed')
-            .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
-            .slice(0, 4);
-          return [...openIssues, ...closedIssues];
-        });
+          const filteredReposResults = allReposResults.map(repoIssues => {
+            const openIssues = repoIssues.filter(i => i.state === 'open');
+            const closedIssues = repoIssues
+              .filter(i => i.state === 'closed')
+              .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+              .slice(0, 4);
+            return [...openIssues, ...closedIssues];
+          });
 
-        const issuesData = filteredReposResults.flat();
+          const issuesData = filteredReposResults.flat();
 
-        // Fetch PR metadata in bulk to get SHAs
-        const prMetadataMap = new Map<string, string>();
-        await Promise.all(effectiveRepoList.map(async (repo) => {
-          try {
-            const response = await fetch(`https://api.github.com/repos/${repo}/pulls?state=all&per_page=100`, { headers });
-            if (response.ok) {
-              const prs: any[] = await response.json();
-              prs.forEach(pr => {
-                if (pr.head?.sha) {
-                  prMetadataMap.set(`${repo}#${pr.number}`, pr.head.sha);
-                }
-              });
+          // Fetch PR metadata in bulk to get SHAs
+          const prMetadataMap = new Map<string, string>();
+          await Promise.all(effectiveRepoList.map(async (repo) => {
+            try {
+              const response = await fetch(`https://api.github.com/repos/${repo}/pulls?state=all&per_page=100`, { headers });
+              if (response.ok) {
+                const prs: any[] = await response.json();
+                prs.forEach(pr => {
+                  if (pr.head?.sha) {
+                    prMetadataMap.set(`${repo}#${pr.number}`, pr.head.sha);
+                  }
+                });
+              }
+            } catch (err) {
+              console.error(`Failed to fetch PR metadata for ${repo}`, err);
             }
-          } catch (err) {
-            console.error(`Failed to fetch PR metadata for ${repo}`, err);
-          }
-        }));
+          }));
 
-        // Consolidation and Sorting
-        const finalIssues: IssueWithJulesStatus[] = [];
-        const linkedPrNumbers = new Set<number>();
+          // Consolidation and Sorting
+          const tempIssues: IssueWithJulesStatus[] = [];
 
-        const issuesOnly = issuesData.filter(item => !item.pull_request) as IssueWithJulesStatus[];
-        const prsOnly = issuesData.filter(item => item.pull_request);
+          const issuesOnly = issuesData.filter(item => !item.pull_request) as IssueWithJulesStatus[];
+          const prsOnly = issuesData.filter(item => item.pull_request);
 
-        const issuesByNumber = new Map<string, IssueWithJulesStatus>(issuesOnly.map(issue => [`${issue.repository.full_name}#${issue.number}`, issue]));
+          const issuesByNumber = new Map<string, IssueWithJulesStatus>(issuesOnly.map(issue => [`${issue.repository.full_name}#${issue.number}`, issue]));
 
-        prsOnly.forEach(pr => {
-          if (pr.body) {
-            const regex = /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi;
-            let match;
-            while ((match = regex.exec(pr.body)) !== null) {
-              const issueNumber = parseInt(match[1], 10);
-              const issueKey = `${pr.repository.full_name}#${issueNumber}`;
-              const issue = issuesByNumber.get(issueKey);
-              if (issue) {
-                if (!issue.linkedPRs) {
-                  issue.linkedPRs = [];
+          prsOnly.forEach(pr => {
+            if (pr.body) {
+              const regex = /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi;
+              let match;
+              while ((match = regex.exec(pr.body)) !== null) {
+                const issueNumber = parseInt(match[1], 10);
+                const issueKey = `${pr.repository.full_name}#${issueNumber}`;
+                const issue = issuesByNumber.get(issueKey);
+                if (issue) {
+                  if (!issue.linkedPRs) {
+                    issue.linkedPRs = [];
+                  }
+                  issue.linkedPRs.push(pr as IssueWithJulesStatus);
                 }
-                issue.linkedPRs.push(pr as IssueWithJulesStatus);
-                linkedPrNumbers.add(pr.id);
               }
             }
-          }
-        });
+          });
 
-        issuesOnly.forEach(issue => finalIssues.push(issue as IssueWithJulesStatus));
+          issuesOnly.forEach(issue => tempIssues.push(issue as IssueWithJulesStatus));
 
-        // Sort by updated_at descending
-        finalIssues.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+          // Sort by updated_at descending
+          tempIssues.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
+
+          allConsolidatedIssuesRef.current = tempIssues;
+          lastFetchKeyRef.current = fetchKey;
+          finalIssues = [...tempIssues];
+        }
+
+        // Apply filtering
+        const filteredIssues = debouncedSearchTerm.trim() === ''
+          ? finalIssues
+          : finalIssues.filter(issue => {
+              const term = debouncedSearchTerm.toLowerCase();
+              const inRepo = issue.repository.full_name.toLowerCase().includes(term);
+              const inTitle = issue.title.toLowerCase().includes(term);
+              const inPr = issue.linkedPRs?.some(pr =>
+                pr.title.toLowerCase().includes(term) ||
+                (pr.body && pr.body.toLowerCase().includes(term)) ||
+                `#${pr.number}`.includes(term)
+              );
+              return inRepo || inTitle || inPr;
+            });
 
         // Optimization: Slice BEFORE fetching statuses
-        const visibleIssues = finalIssues.slice(0, pageSize).map(item => {
+        const visibleIssues = filteredIssues.slice(0, pageSize).map(item => {
           const isJules = (
             item.assignee?.login?.toLowerCase() === 'jules' ||
             item.assignee?.login?.toLowerCase() === 'google-labs-jules[bot]' ||
@@ -534,7 +571,7 @@ function App() {
     return () => {
       isCancelled = true;
     };
-  }, [ghToken, julesToken, filterState, refreshTrigger, pageSize, repoHistory]);
+  }, [ghToken, julesToken, filterState, refreshTrigger, pageSize, repoHistory, debouncedSearchTerm]);
 
   return (
     <div className="dashboard">
@@ -542,6 +579,15 @@ function App() {
         <div className="header-content">
           <div>
             <h1>AI-Dashboard</h1>
+          </div>
+          <div className="header-filter">
+            <input
+              type="text"
+              className="filter-input"
+              placeholder="Filter by repo, title, or PR..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
           </div>
           <div className="header-actions">
             <button className="btn-refresh" onClick={() => setRefreshTrigger(prev => prev + 1)}>

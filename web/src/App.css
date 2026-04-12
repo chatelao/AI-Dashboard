@@ -30,6 +30,31 @@ h1 {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.header-filter {
+  flex-grow: 1;
+  max-width: 500px;
+}
+
+.filter-input {
+  width: 100%;
+  padding: 8px 12px;
+  background-color: #0d1117;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  color: #c9d1d9;
+  font-family: inherit;
+  font-size: 0.9rem;
+  box-sizing: border-box;
+  height: 38px;
+}
+
+.filter-input:focus {
+  outline: none;
+  border-color: #58a6ff;
+  box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
 }
 
 
@@ -343,8 +368,16 @@ a:hover {
 
   .header-content {
     flex-direction: row;
+    flex-wrap: wrap;
     align-items: center;
     gap: 0.5rem;
+  }
+
+  .header-filter {
+    order: 3;
+    flex: 0 0 100%;
+    max-width: none;
+    margin-top: 0.5rem;
   }
 
   .header-actions {
