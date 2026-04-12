@@ -40,6 +40,8 @@ interface IssueWithJulesStatus extends GitHubIssue {
   mergeable?: boolean | null;
   mergeable_state?: string;
   actionLoading?: boolean;
+  prFilesCount?: number;
+  prFileExtensions?: string[];
 }
 
 const DEFAULT_JULES_API_BASE = 'https://jules.googleapis.com/v1alpha';
@@ -400,6 +402,27 @@ function App() {
           // Sort by updated_at descending
           tempIssues.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
 
+          prsOnly.forEach(pr => {
+            if (!pr.body) {
+              tempIssues.push(pr as IssueWithJulesStatus);
+            } else {
+              const regex = /(?:close|closes|closed|fix|fixes|fixed|resolve|resolves|resolved)\s+#(\d+)/gi;
+              let match;
+              let linked = false;
+              while ((match = regex.exec(pr.body)) !== null) {
+                const issueNumber = parseInt(match[1], 10);
+                const issueKey = `${pr.repository.full_name}#${issueNumber}`;
+                const issue = issuesByNumber.get(issueKey);
+                if (issue) {
+                  linked = true;
+                }
+              }
+              if (!linked) {
+                tempIssues.push(pr as IssueWithJulesStatus);
+              }
+            }
+          });
+
           allConsolidatedIssuesRef.current = tempIssues;
           lastFetchKeyRef.current = fetchKey;
           finalIssues = [...tempIssues];
@@ -497,6 +520,29 @@ function App() {
                     const prDetail: any = await prResponse.json();
                     target.mergeable = prDetail.mergeable;
                     target.mergeable_state = prDetail.mergeable_state;
+
+                    // Fetch PR files to get count and extensions
+                    try {
+                      const filesResponse = await fetch(
+                        `https://api.github.com/repos/${target.repository.full_name}/pulls/${target.number}/files`,
+                        { headers }
+                      );
+                      if (filesResponse.ok) {
+                        const filesData: any[] = await filesResponse.json();
+                        target.prFilesCount = filesData.length;
+                        const extensions = new Set<string>();
+                        filesData.forEach(file => {
+                          const parts = file.filename.split('.');
+                          if (parts.length > 1) {
+                            extensions.add(`.${parts.pop()}`);
+                          }
+                        });
+                        target.prFileExtensions = Array.from(extensions);
+                      }
+                    } catch (err) {
+                      console.error(`Failed to fetch files for PR #${target.number}`, err);
+                    }
+
                     const sha = prDetail?.head?.sha;
 
                     if (sha) {
@@ -680,11 +726,21 @@ function App() {
                       <div className="title-container">
                         <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
                           <span className="repo-tag">[{issue.repository.full_name.split('/')[1]}]</span> {issue.title}
+                          {issue.prFilesCount !== undefined && (
+                            <span className="pr-files-info">
+                              {' '}({issue.prFilesCount} {issue.prFilesCount === 1 ? 'file' : 'files'}{issue.prFileExtensions && issue.prFileExtensions.length > 0 ? `, ${issue.prFileExtensions.join(', ')}` : ''})
+                            </span>
+                          )}
                         </a>
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
                           <div key={pr.id} className="subtitle">
                             <a href={pr.html_url} target="_blank" rel="noopener noreferrer">
                               <span className="pr-number">PR #{pr.number}:</span> {pr.title}
+                              {pr.prFilesCount !== undefined && (
+                                <span className="pr-files-info">
+                                  {' '}({pr.prFilesCount} {pr.prFilesCount === 1 ? 'file' : 'files'}{pr.prFileExtensions && pr.prFileExtensions.length > 0 ? `, ${pr.prFileExtensions.join(', ')}` : ''})
+                                </span>
+                              )}
                             </a>
                           </div>
                         ))}
