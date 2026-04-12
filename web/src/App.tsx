@@ -298,11 +298,6 @@ function App() {
         });
 
         issuesOnly.forEach(issue => finalIssues.push(issue as IssueWithJulesStatus));
-        prsOnly.forEach(pr => {
-          if (!linkedPrNumbers.has(pr.id)) {
-            finalIssues.push(pr as IssueWithJulesStatus);
-          }
-        });
 
         // Sort by updated_at descending
         finalIssues.sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime());
