@@ -568,12 +568,12 @@ function App() {
                     <td data-label="Title">
                       <div className="title-container">
                         <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
-                          [{issue.repository.full_name.split('/')[1]}] {issue.title}
+                          <span className="repo-tag">[{issue.repository.full_name.split('/')[1]}]</span> {issue.title}
                         </a>
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
                           <div key={pr.id} className="subtitle">
                             <a href={pr.html_url} target="_blank" rel="noopener noreferrer">
-                              PR #{pr.number}: {pr.title}
+                              <span className="pr-number">PR #{pr.number}:</span> {pr.title}
                             </a>
                           </div>
                         ))}
