@@ -93,6 +93,10 @@ function App() {
   );
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
+  const formatJulesStatus = (status: string) => {
+    return status === 'in-progress' ? 'InProgress' : status.replace(/-/g, ' ');
+  };
+
   const fetchRawIssues = async (repo: string, filterState: string, headers: HeadersInit): Promise<GitHubIssue[]> => {
     // Check if we are in a test environment (e.g., Playwright)
     const isTest = window.location.search.includes('test=true') || (window as any).isTest;
@@ -854,12 +858,12 @@ function App() {
                           issue.julesUrl ? (
                             <a href={issue.julesUrl} target="_blank" rel="noopener noreferrer">
                               <span className={`badge jules-status-${issue.julesStatus}`}>
-                                {issue.julesStatus.replace(/-/g, ' ')}
+                                {formatJulesStatus(issue.julesStatus)}
                               </span>
                             </a>
                           ) : (
                             <span className={`badge jules-status-${issue.julesStatus}`}>
-                              {issue.julesStatus.replace(/-/g, ' ')}
+                              {formatJulesStatus(issue.julesStatus)}
                             </span>
                           )
                         ) : (
@@ -881,12 +885,12 @@ function App() {
                               {pr.julesUrl ? (
                                 <a href={pr.julesUrl} target="_blank" rel="noopener noreferrer">
                                   <span className={`badge jules-status-${pr.julesStatus}`}>
-                                    {pr.julesStatus.replace(/-/g, ' ')}
+                                    {formatJulesStatus(pr.julesStatus)}
                                   </span>
                                 </a>
                               ) : (
                                 <span className={`badge jules-status-${pr.julesStatus}`}>
-                                  {pr.julesStatus.replace(/-/g, ' ')}
+                                  {formatJulesStatus(pr.julesStatus)}
                                 </span>
                               )}
                             </div>
