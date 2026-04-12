@@ -41,26 +41,31 @@ if (!function_exists('getallheaders')) {
  * which is often stripped by Apache/FastCGI.
  */
 function getallheaders_robust() {
-    $headers = getallheaders();
-    if (!isset($headers['Authorization'])) {
+    $headers = array_change_key_case(getallheaders(), CASE_LOWER);
+    if (!isset($headers['authorization'])) {
         if (isset($_SERVER['HTTP_AUTHORIZATION'])) {
-            $headers['Authorization'] = $_SERVER['HTTP_AUTHORIZATION'];
+            $headers['authorization'] = $_SERVER['HTTP_AUTHORIZATION'];
         } elseif (isset($_SERVER['REDIRECT_HTTP_AUTHORIZATION'])) {
-            $headers['Authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
-        } elseif (isset($headers['X-Authorization'])) {
-            $headers['Authorization'] = $headers['X-Authorization'];
+            $headers['authorization'] = $_SERVER['REDIRECT_HTTP_AUTHORIZATION'];
+        } elseif (isset($headers['x-authorization'])) {
+            $headers['authorization'] = $headers['x-authorization'];
         } elseif (isset($_SERVER['HTTP_X_AUTHORIZATION'])) {
-            $headers['Authorization'] = $_SERVER['HTTP_X_AUTHORIZATION'];
+            $headers['authorization'] = $_SERVER['HTTP_X_AUTHORIZATION'];
         }
+    }
+    if (!isset($headers['x-goog-api-key']) && isset($_SERVER['HTTP_X_GOOG_API_KEY'])) {
+        $headers['x-goog-api-key'] = $_SERVER['HTTP_X_GOOG_API_KEY'];
     }
     return $headers;
 }
 
 // 1. Handle CORS Preflight
+$origin = $_SERVER['HTTP_ORIGIN'] ?? '*';
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
-    header("Access-Control-Allow-Origin: *");
-    header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+    header("Access-Control-Allow-Origin: $origin");
+    header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
     header("Access-Control-Allow-Headers: *");
+    header("Access-Control-Allow-Credentials: true");
     exit;
 }
 
@@ -96,7 +101,7 @@ if (isset($_GET['url'])) {
 }
 
 // 3. Forward the request using cURL
-$headers = array_change_key_case(getallheaders_robust(), CASE_LOWER);
+$headers = getallheaders_robust();
 
 // DIAGNOSTIC: Check for authentication headers if calling Jules API
 $hasAuth = isset($headers['authorization']) ||
@@ -104,7 +109,8 @@ $hasAuth = isset($headers['authorization']) ||
            isset($headers['x-goog-api-key']);
 
 if (!$hasAuth && strpos($targetUrl, 'https://jules.googleapis.com/') === 0) {
-    header("Access-Control-Allow-Origin: *");
+    header("Access-Control-Allow-Origin: $origin");
+    header("Access-Control-Allow-Credentials: true");
     header("Content-Type: application/json");
     http_response_code(401);
     echo json_encode([
@@ -124,10 +130,9 @@ $curlHeaders = [];
 $excludedHeaders = ['host', 'origin', 'referer'];
 foreach ($headers as $key => $value) {
     if (!in_array($key, $excludedHeaders) && strpos($key, 'sec-') !== 0) {
-        // Use original case if possible, but $headers is now lowercase keys
-        // For standard headers, title-case is usually fine if we wanted to be fancy,
-        // but most APIs (including Google) handle lowercase headers fine (HTTP/2 requires it anyway).
-        $curlHeaders[] = "$key: $value";
+        // Normalize common headers for better compatibility
+        $normalizedKey = str_replace(' ', '-', ucwords(str_replace('-', ' ', $key)));
+        $curlHeaders[] = "$normalizedKey: $value";
     }
 }
 curl_setopt($ch, CURLOPT_HTTPHEADER, $curlHeaders);
@@ -153,9 +158,10 @@ $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
 curl_close($ch);
 
 // 4. Send Response with CORS headers
-header("Access-Control-Allow-Origin: *");
-header("Access-Control-Allow-Methods: GET, POST, OPTIONS");
+header("Access-Control-Allow-Origin: $origin");
+header("Access-Control-Allow-Methods: GET, POST, OPTIONS, PUT, DELETE");
 header("Access-Control-Allow-Headers: *");
+header("Access-Control-Allow-Credentials: true");
 header("Content-Type: $responseContentType");
 http_response_code($httpCode);
 echo $response;
