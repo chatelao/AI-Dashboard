@@ -52,11 +52,21 @@ function App() {
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [draftJulesApiBase, setDraftJulesApiBase] = useState<string>(julesApiBase);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+
   const [repoHistory, setRepoHistory] = useState<string[]>(() => {
     const saved = localStorage.getItem('gh_repos');
     return saved ? JSON.parse(saved) : ['chatelao/AI-Dashboard'];
   });
   const [draftRepoHistory, setDraftRepoHistory] = useState<string>(repoHistory.join(', '));
+
+  useEffect(() => {
+    if (showSettings) {
+      setDraftGhToken(ghToken);
+      setDraftJulesToken(julesToken);
+      setDraftJulesApiBase(julesApiBase);
+      setDraftRepoHistory(repoHistory.join(', '));
+    }
+  }, [showSettings, ghToken, julesToken, julesApiBase, repoHistory]);
   const [filterState] = useState<'all' | 'open'>(
     (localStorage.getItem('filter_state') as 'all' | 'open') || 'all'
   );

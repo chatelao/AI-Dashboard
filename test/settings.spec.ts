@@ -1,13 +1,14 @@
 import { test, expect } from '@playwright/test';
 
 test('can manage tracked repositories via settings', async ({ page }) => {
-  // Set mock token and initial repo
+  // Set mock token and initial state
   await page.addInitScript(() => {
     window.localStorage.setItem('github_token', 'mock-gh-token');
+    window.localStorage.setItem('gh_repos', JSON.stringify(['repo1/a']));
     (window as any).isTest = true;
   });
 
-  // Mock repo1
+  // Mock repo1 (default) issues
   await page.route('**/repos/repo1/a/issues?state=all*', async (route) => {
     await route.fulfill({
       status: 200,
@@ -28,7 +29,16 @@ test('can manage tracked repositories via settings', async ({ page }) => {
     });
   });
 
-  // Mock repo2
+  // Mock repo1 pulls
+  await page.route('**/repos/repo1/a/pulls?state=all*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([])
+    });
+  });
+
+  // Mock repo2 issues
   await page.route('**/repos/repo2/b/issues?state=all*', async (route) => {
     await route.fulfill({
       status: 200,
@@ -49,7 +59,19 @@ test('can manage tracked repositories via settings', async ({ page }) => {
     });
   });
 
+  // Mock repo2 pulls
+  await page.route('**/repos/repo2/b/pulls?state=all*', async (route) => {
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify([])
+    });
+  });
+
   await page.goto('/');
+
+  // Wait for the first row to be visible
+  await expect(page.locator('text=[a] Issue from repo1')).toBeVisible();
 
   // Open settings
   await page.click('button[aria-label="Settings"]');
@@ -58,12 +80,14 @@ test('can manage tracked repositories via settings', async ({ page }) => {
   const repoInput = page.locator('#repo-history');
   await repoInput.fill('repo1/a, repo2/b');
 
-  // Save settings
+  // Save settings and wait for requests to complete
+  const savePromise = page.waitForResponse('**/repos/repo2/b/issues?state=all*');
   await page.click('button.btn-save');
+  await savePromise;
 
   // Verify both issues are present
   const rows = page.locator('tbody tr');
-  await expect(rows).toHaveCount(2);
+  await expect(rows).toHaveCount(2, { timeout: 10000 });
 
   await expect(page.locator('text=[a] Issue from repo1')).toBeVisible();
   await expect(page.locator('text=[b] Issue from repo2')).toBeVisible();
