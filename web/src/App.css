@@ -429,7 +429,7 @@ a:hover {
   }
 
   td::before {
-    display: block;
+    display: none;
     content: attr(data-label);
     font-size: 0.7rem;
     text-transform: uppercase;
@@ -437,10 +437,6 @@ a:hover {
     margin-bottom: 6px;
     font-weight: 600;
     letter-spacing: 0.05em;
-  }
-
-  td[data-label="Title"]::before {
-    display: none;
   }
 
   .title-container {
