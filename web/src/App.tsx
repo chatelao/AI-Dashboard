@@ -36,7 +36,7 @@ interface IssueWithJulesStatus extends GitHubIssue {
   isJules?: boolean;
 }
 
-const JULES_API_BASE_URL = 'https://jules.googleapis.com/v1';
+const DEFAULT_JULES_API_BASE = 'https://jules.googleapis.com/v1';
 
 function App() {
   const [issues, setIssues] = useState<IssueWithJulesStatus[]>([]);
@@ -44,8 +44,10 @@ function App() {
   const [error, setError] = useState<string | null>(null);
   const [ghToken, setGhToken] = useState<string>(localStorage.getItem('github_token') || '');
   const [julesToken, setJulesToken] = useState<string>(localStorage.getItem('jules_token') || '');
+  const [julesApiBase, setJulesApiBase] = useState<string>(localStorage.getItem('jules_api_base') || DEFAULT_JULES_API_BASE);
   const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
+  const [draftJulesApiBase, setDraftJulesApiBase] = useState<string>(julesApiBase);
   const [showSettings, setShowSettings] = useState<boolean>(false);
   const [currentRepo, setCurrentRepo] = useState<string>(localStorage.getItem('current_gh_repo') || 'chatelao/AI-Dashboard');
   const [repoHistory, setRepoHistory] = useState<string[]>(() => {
@@ -61,7 +63,7 @@ function App() {
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   const fetchJulesStatus = async (issueId: number, token: string): Promise<{ status: string; url?: string } | undefined> => {
-    const url = `${JULES_API_BASE_URL}/tasks/${issueId}/status`;
+    const url = `${julesApiBase}/tasks/${issueId}/status`;
     console.log(`Fetching Jules status from: ${url}`);
     try {
       const response = await fetch(url, {
@@ -94,8 +96,10 @@ function App() {
   const handleSaveSettings = () => {
     localStorage.setItem('github_token', draftGhToken);
     localStorage.setItem('jules_token', draftJulesToken);
+    localStorage.setItem('jules_api_base', draftJulesApiBase);
     setGhToken(draftGhToken);
     setJulesToken(draftJulesToken);
+    setJulesApiBase(draftJulesApiBase);
     setShowSettings(false);
     setRefreshTrigger(prev => prev + 1);
   };
@@ -103,10 +107,13 @@ function App() {
   const handleClearSettings = () => {
     localStorage.removeItem('github_token');
     localStorage.removeItem('jules_token');
+    localStorage.removeItem('jules_api_base');
     setGhToken('');
     setJulesToken('');
+    setJulesApiBase(DEFAULT_JULES_API_BASE);
     setDraftGhToken('');
     setDraftJulesToken('');
+    setDraftJulesApiBase(DEFAULT_JULES_API_BASE);
     setShowSettings(false);
     setRefreshTrigger(prev => prev + 1);
   };
@@ -341,6 +348,17 @@ function App() {
               onChange={(e) => setDraftJulesToken(e.target.value)}
               placeholder="Enter Jules token"
             />
+          </div>
+          <div className="settings-group">
+            <label htmlFor="jules-api-base">Jules API Base URL:</label>
+            <input
+              id="jules-api-base"
+              type="text"
+              value={draftJulesApiBase}
+              onChange={(e) => setDraftJulesApiBase(e.target.value)}
+              placeholder="https://jules.googleapis.com/v1"
+            />
+            <small className="help-text">Use this to configure a CORS proxy if needed.</small>
           </div>
           <div className="settings-actions">
             <button className="btn-save" onClick={handleSaveSettings}>Save & Reload</button>
