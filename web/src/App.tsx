@@ -119,7 +119,8 @@ function App() {
     try {
       const response = await fetch(url, {
         headers: {
-          'Authorization': `Bearer ${token}`
+          'Authorization': `Bearer ${token}`,
+          'X-Authorization': `Bearer ${token}`
         }
       });
       console.log(`Jules API response status for issue ${issueId}: ${response.status}`);
