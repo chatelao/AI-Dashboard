@@ -40,11 +40,19 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
   });
 
   // Mock Jules API for Issue 101
-  await page.route('**/v1/tasks/101/status', async (route) => {
+  await page.route('**/v1alpha/sessions?filter=prompt%20:%20%22%23101%22', async (route) => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ status: 'Coding' })
+      body: JSON.stringify({
+        sessions: [
+          {
+            name: 'sessions/123',
+            state: 'STATE_CODING',
+            url: 'https://jules.google.com/session/123'
+          }
+        ]
+      })
     });
   });
 
@@ -61,7 +69,7 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
   // but since we want to be specific about the columns:
   const row101 = page.locator('tr', { has: page.locator('text=Jules issue') });
   await expect(row101.locator('td').nth(0)).toContainText('[AI-Dashboard]');
-  await expect(row101.locator('td').nth(3)).toContainText('Coding');
+  await expect(row101.locator('td').nth(3)).toContainText('coding');
 });
 
 test('dashboard aggregates issues from all repositories', async ({ page }) => {

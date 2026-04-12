@@ -50,4 +50,27 @@ header("Access-Control-Allow-Headers: *");
 header("Access-Control-Allow-Credentials: true");
 header('Content-Type: application/json');
 
+// Mock response based on the request URI for v1alpha/sessions
+$uri = $_SERVER['REQUEST_URI'] ?? '';
+if (strpos($uri, 'v1alpha/sessions') !== false) {
+    $filter = $_GET['filter'] ?? '';
+    $issueNumber = 'unknown';
+    if (preg_match('/#(\d+)/', $filter, $matches)) {
+        $issueNumber = $matches[1];
+    }
+
+    echo json_encode([
+        'sessions' => [
+            [
+                'name' => 'sessions/mock-' . $issueNumber,
+                'state' => 'STATE_CODING',
+                'url' => 'https://jules.google.com/session/mock-' . $issueNumber,
+                'prompt' => "Fix issue #$issueNumber",
+                'createTime' => date('c')
+            ]
+        ]
+    ]);
+    exit;
+}
+
 echo json_encode(['headers' => $headers, 'server' => $_SERVER]);
