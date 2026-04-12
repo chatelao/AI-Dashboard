@@ -4,7 +4,7 @@ test('has title', async ({ page }) => {
   await page.goto('/');
 
   // Expect a title "to contain" a substring.
-  await expect(page).toHaveTitle(/AI Development Dashboard/);
+  await expect(page).toHaveTitle(/AI-Dashboard/);
 
   // Expect the description text to NOT be present.
   await expect(page.locator('text=Unified view of GitHub Issues and Google Jules Statuses')).not.toBeVisible();

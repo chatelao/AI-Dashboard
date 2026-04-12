@@ -1,6 +1,6 @@
 # Data Fetching Documentation
 
-This document describes how the AI Development Dashboard collects and processes data from various sources.
+This document describes how the AI-Dashboard collects and processes data from various sources.
 
 ## Data Sources
 
