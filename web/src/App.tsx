@@ -52,10 +52,11 @@ function App() {
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [draftJulesApiBase, setDraftJulesApiBase] = useState<string>(julesApiBase);
   const [showSettings, setShowSettings] = useState<boolean>(false);
-  const [repoHistory] = useState<string[]>(() => {
+  const [repoHistory, setRepoHistory] = useState<string[]>(() => {
     const saved = localStorage.getItem('gh_repos');
     return saved ? JSON.parse(saved) : ['chatelao/AI-Dashboard'];
   });
+  const [draftRepoHistory, setDraftRepoHistory] = useState<string>(repoHistory.join(', '));
   const [filterState] = useState<'all' | 'open'>(
     (localStorage.getItem('filter_state') as 'all' | 'open') || 'all'
   );
@@ -125,12 +126,15 @@ function App() {
   };
 
   const handleSaveSettings = () => {
+    const newRepos = draftRepoHistory.split(',').map(r => r.trim()).filter(r => r.length > 0);
     localStorage.setItem('github_token', draftGhToken);
     localStorage.setItem('jules_token', draftJulesToken);
     localStorage.setItem('jules_api_base', draftJulesApiBase);
+    localStorage.setItem('gh_repos', JSON.stringify(newRepos));
     setGhToken(draftGhToken);
     setJulesToken(draftJulesToken);
     setJulesApiBase(draftJulesApiBase);
+    setRepoHistory(newRepos);
     setShowSettings(false);
     setRefreshTrigger(prev => prev + 1);
   };
@@ -139,12 +143,15 @@ function App() {
     localStorage.removeItem('github_token');
     localStorage.removeItem('jules_token');
     localStorage.removeItem('jules_api_base');
+    localStorage.removeItem('gh_repos');
     setGhToken('');
     setJulesToken('');
     setJulesApiBase(DEFAULT_JULES_API_BASE);
+    setRepoHistory(['chatelao/AI-Dashboard']);
     setDraftGhToken('');
     setDraftJulesToken('');
     setDraftJulesApiBase(DEFAULT_JULES_API_BASE);
+    setDraftRepoHistory('chatelao/AI-Dashboard');
     setShowSettings(false);
     setRefreshTrigger(prev => prev + 1);
   };
@@ -425,6 +432,16 @@ function App() {
             <small className="help-text">
               Use this to configure a CORS proxy if needed. See <a href="https://github.com/chatelao/AI-Dashboard/blob/main/CORS_PROXY.md" target="_blank" rel="noopener noreferrer">CORS_PROXY.md</a> for instructions.
             </small>
+          </div>
+          <div className="settings-group">
+            <label htmlFor="repo-history">Tracked Repositories (comma-separated):</label>
+            <input
+              id="repo-history"
+              type="text"
+              value={draftRepoHistory}
+              onChange={(e) => setDraftRepoHistory(e.target.value)}
+              placeholder="owner/repo, owner2/repo2"
+            />
           </div>
           <div className="settings-actions">
             <button className="btn-save" onClick={handleSaveSettings}>Save & Reload</button>
