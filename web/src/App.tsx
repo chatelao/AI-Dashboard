@@ -390,7 +390,7 @@ function App() {
       <header>
         <div className="header-content">
           <div>
-            <h1>AI Development Dashboard</h1>
+            <h1>AI-Dashboard</h1>
           </div>
           <div className="header-actions">
             <button className="btn-refresh" onClick={() => setRefreshTrigger(prev => prev + 1)}>

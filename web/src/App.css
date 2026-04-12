@@ -322,13 +322,12 @@ a:hover {
   }
 
   .header-content {
-    flex-direction: column;
-    align-items: flex-start;
+    flex-direction: row;
+    align-items: center;
     gap: 0.5rem;
   }
 
   .header-actions {
-    width: 100%;
     justify-content: flex-end;
   }
 
