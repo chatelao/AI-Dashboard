@@ -90,6 +90,20 @@ function App() {
       setDraftRepoHistory(repoHistory.join(', '));
     }
   }, [showSettings, ghToken, julesToken, julesApiBase, repoHistory]);
+
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        setRefreshTrigger(prev => prev + 1);
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, []);
+
   const [filterState] = useState<'all' | 'open'>(
     (localStorage.getItem('filter_state') as 'all' | 'open') || 'all'
   );
