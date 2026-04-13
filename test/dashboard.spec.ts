@@ -79,7 +79,7 @@ test('dashboard loads issues and displays Jules status', async ({ page }) => {
   // but since we want to be specific about the columns:
   const row101 = page.locator('tr', { has: page.locator('text=Jules issue') });
   await expect(row101.locator('td').nth(0)).toContainText('[AI-Dashboard]');
-  await expect(row101.locator('td').nth(3)).toContainText('coding');
+  await expect(row101.locator('td').nth(3)).toContainText('Coding');
 });
 
 test('dashboard displays InProgress for STATE_IN_PROGRESS', async ({ page }) => {

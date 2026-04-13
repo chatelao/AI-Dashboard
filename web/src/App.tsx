@@ -113,7 +113,11 @@ function App() {
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   const formatJulesStatus = (status: string) => {
-    return status === 'in-progress' ? 'InProgress' : status.replace(/-/g, ' ');
+    if (status === 'in-progress') return 'InProgress';
+    return status
+      .split('-')
+      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+      .join(' ');
   };
 
   const fetchRawIssues = async (repo: string, filterState: string, headers: HeadersInit): Promise<GitHubIssue[]> => {
@@ -781,7 +785,7 @@ function App() {
                     </td>
                     <td data-label="State">
                       <span className={`badge state-${issue.state}`}>
-                        {issue.state}
+                        {issue.state.charAt(0).toUpperCase() + issue.state.slice(1)}
                       </span>
                     </td>
                     <td data-label="PR">
