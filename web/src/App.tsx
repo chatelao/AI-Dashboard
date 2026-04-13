@@ -633,7 +633,7 @@ function App() {
       <header>
         <div className="header-content">
           <div>
-            <h1>AI-Dashboard</h1>
+            <h1>Dashboard</h1>
           </div>
           <div className="header-filter">
             <input
