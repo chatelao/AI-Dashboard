@@ -313,6 +313,12 @@ a:hover {
   text-align: left;
 }
 
+.issue-title-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .repo-tag {
   font-size: 0.7rem;
   background-color: rgba(139, 148, 158, 0.15);

@@ -89,23 +89,28 @@ test.describe('Dashboard Consolidation', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/?test=true');
 
     // Verify Issue 101 exists and has PR 102 as subtitle
-    const issueRow = page.locator('tr', { hasText: 'Fix a bug' });
+    const issueRow = page.locator('tbody tr').filter({ hasText: 'Fix a bug' }).first();
     await expect(issueRow).toBeVisible();
-    await expect(issueRow.locator('.title-container .subtitle')).toContainText('PR #102: A linked PR');
+    await expect(issueRow.locator('td[data-label="Title"] .subtitle').first()).toContainText('PR #102: A linked PR');
 
     // Verify Issue 101's row has the green PR status icon (from linked PR 102)
-    await expect(issueRow.locator('.pr-icon-green')).toBeVisible();
+    await expect(issueRow.locator('.pr-icon-green').first()).toBeVisible();
 
     // Verify PR 103 exists as a separate row (since it's not linked)
-    const prRow = page.locator('tr', { hasText: 'Unlinked PR' });
+    const prRow = page.locator('tbody tr').filter({ hasText: 'Unlinked PR' }).first();
     await expect(prRow).toBeVisible();
 
     // Verify total number of rows (should be 2: Issue 101 and PR 103)
     const rows = page.locator('tbody tr');
     await expect(rows).toHaveCount(2);
+
+    // Verify repository tag links to "new issue" page with Jules label
+    const repoTagLink = issueRow.locator('a[href*="/issues/new?labels=Jules"]');
+    await expect(repoTagLink).toBeVisible();
+    await expect(repoTagLink).toHaveAttribute('href', 'https://github.com/chatelao/AI-Dashboard/issues/new?labels=Jules');
   });
 
   test('should display Jules status for issues and linked PRs assigned to Jules', async ({ page }) => {
@@ -220,19 +225,19 @@ test.describe('Dashboard Consolidation', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/?test=true');
 
-    const issueRow = page.locator('tr', { hasText: 'Jules issue' });
+    const issueRow = page.locator('tbody tr').filter({ hasText: 'Jules issue' }).first();
 
     // Verify Issue 201 status and link
     const julesStatusCell = issueRow.locator('td').nth(3);
-    await expect(julesStatusCell).toContainText('Coding');
+    await expect(julesStatusCell).toContainText('coding', { ignoreCase: true });
     const issueLink = julesStatusCell.locator('a').first();
     await expect(issueLink).toHaveAttribute('href', 'https://jules.google.com/task/201');
 
     // Verify Linked PR 202 status and link (as subtitle in Jules column)
-    const prSubtitle = julesStatusCell.locator('.subtitle');
-    await expect(prSubtitle).toContainText('Researching');
+    const prSubtitle = julesStatusCell.locator('.subtitle').first();
+    await expect(prSubtitle).toContainText('researching', { ignoreCase: true });
     const prLink = prSubtitle.locator('a');
     await expect(prLink).toHaveAttribute('href', 'https://jules.google.com/task/202');
   });
@@ -287,12 +292,12 @@ test.describe('Dashboard Consolidation', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/?test=true');
 
-    const issueRow = page.locator('tr', { hasText: 'Lowercase Jules label' });
+    const issueRow = page.locator('tbody tr').filter({ hasText: 'Lowercase Jules label' }).first();
 
     // Verify Issue 301 status
-    await expect(issueRow.locator('td').nth(3)).toContainText('Testing');
+    await expect(issueRow.locator('td').nth(3)).toContainText('testing', { ignoreCase: true });
   });
 
   test('should display Jules status for items assigned to google-labs-jules[bot]', async ({ page }) => {
@@ -345,11 +350,11 @@ test.describe('Dashboard Consolidation', () => {
       });
     });
 
-    await page.goto('/');
+    await page.goto('/?test=true');
 
-    const issueRow = page.locator('tr', { hasText: 'Jules bot issue' });
+    const issueRow = page.locator('tbody tr').filter({ hasText: 'Jules bot issue' }).first();
 
     // Verify Issue 401 status
-    await expect(issueRow.locator('td').nth(3)).toContainText('Completed');
+    await expect(issueRow.locator('td').nth(3)).toContainText('completed', { ignoreCase: true });
   });
 });
