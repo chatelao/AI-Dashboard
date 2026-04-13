@@ -734,14 +734,23 @@ function App() {
                   <tr key={issue.id}>
                     <td data-label="Title">
                       <div className="title-container">
-                        <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
-                          <span className="repo-tag">[{issue.repository.full_name.split('/')[1]}]</span> {issue.title}
-                          {issue.prFilesCount !== undefined && (
-                            <span className="pr-files-info">
-                              {' '}({issue.prFilesCount} {issue.prFilesCount === 1 ? 'file' : 'files'}{issue.prFileExtensions && issue.prFileExtensions.length > 0 ? `, ${issue.prFileExtensions.join(', ')}` : ''})
-                            </span>
-                          )}
-                        </a>
+                        <div className="issue-title-line">
+                          <a
+                            href={`https://github.com/${issue.repository.full_name}/issues/new?labels=Jules`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <span className="repo-tag">[{issue.repository.full_name.split('/')[1]}]</span>
+                          </a>{' '}
+                          <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
+                            {issue.title}
+                            {issue.prFilesCount !== undefined && (
+                              <span className="pr-files-info">
+                                {' '}({issue.prFilesCount} {issue.prFilesCount === 1 ? 'file' : 'files'}{issue.prFileExtensions && issue.prFileExtensions.length > 0 ? `, ${issue.prFileExtensions.join(', ')}` : ''})
+                              </span>
+                            )}
+                          </a>
+                        </div>
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
                           <div key={pr.id} className="subtitle">
                             <a href={pr.html_url} target="_blank" rel="noopener noreferrer">
