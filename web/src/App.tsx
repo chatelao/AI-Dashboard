@@ -69,6 +69,11 @@ function App() {
 
   const allConsolidatedIssuesRef = useRef<IssueWithJulesStatus[]>([]);
   const lastFetchKeyRef = useRef<string>('');
+  const searchInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    searchInputRef.current?.focus();
+  }, []);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -94,7 +99,7 @@ function App() {
   const [refreshTrigger, setRefreshTrigger] = useState<number>(0);
 
   const formatJulesStatus = (status: string) => {
-    return status === 'IN_PROGRESS' ? 'InProgress' : status.replace(/_/g, ' ');
+    return status === 'in-progress' ? 'InProgress' : status.replace(/-/g, ' ');
   };
 
   const fetchRawIssues = async (repo: string, filterState: string, headers: HeadersInit): Promise<GitHubIssue[]> => {
@@ -632,6 +637,7 @@ function App() {
           </div>
           <div className="header-filter">
             <input
+              ref={searchInputRef}
               type="text"
               className="filter-input"
               placeholder="Filter by repo, title, or PR..."
