@@ -13,7 +13,7 @@ The dashboard uses the GitHub REST API to fetch issues and pull requests for the
     - Each request fetches 100 items per page (`per_page=100`).
     - The `state` parameter is controlled by the dashboard filter (e.g., `open` or `all`).
     - Fetching stops early if a page returns fewer than 100 items or an empty list.
-- **Authentication:** Uses a Personal Access Token (PAT) stored in `localStorage` as `github_token`. It is sent in the `Authorization` header using the `token <TOKEN>` format.
+- **Authentication:** Uses a Personal Access Token (PAT) stored in `localStorage` as `github_token`. It is sent in the `Authorization` header using the `Bearer <TOKEN>` format.
 
 ### 2. Jules API
 For issues and pull requests identified as Jules tasks, the dashboard fetches their status from the Jules API.

@@ -275,7 +275,7 @@ function App() {
       const response = await fetch(`https://api.github.com/repos/${repo}/pulls/${pullNumber}/update-branch`, {
         method: 'PUT',
         headers: {
-          'Authorization': `token ${ghToken}`,
+          'Authorization': `Bearer ${ghToken}`,
           'Accept': 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28'
         }
@@ -300,7 +300,7 @@ function App() {
       const response = await fetch(`https://api.github.com/repos/${repo}/pulls/${pullNumber}/merge`, {
         method: 'PUT',
         headers: {
-          'Authorization': `token ${ghToken}`,
+          'Authorization': `Bearer ${ghToken}`,
           'Accept': 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28'
         }
@@ -343,7 +343,7 @@ function App() {
       try {
         const headers: HeadersInit = {};
         if (ghToken) {
-          headers['Authorization'] = `token ${ghToken}`;
+          headers['Authorization'] = `Bearer ${ghToken}`;
         }
 
         const fetchKey = JSON.stringify([ghToken, repoHistory, filterState, refreshTrigger]);
