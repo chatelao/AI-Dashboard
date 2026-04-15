@@ -574,6 +574,31 @@ a:hover {
   margin-bottom: 0.3rem;
 }
 
+.repo-error-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.repo-error-text {
+  flex: 1;
+}
+
+.btn-authorize {
+  background-color: #238636;
+  color: #ffffff !important;
+  border-color: rgba(240, 246, 252, 0.1);
+  text-decoration: none !important;
+  margin-left: 0;
+  display: inline-block;
+}
+
+.btn-authorize:hover {
+  background-color: #2ea043;
+}
+
 .repo-error-banner li strong {
   color: #f85149;
 }

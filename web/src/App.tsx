@@ -29,6 +29,11 @@ interface PRStatus {
   label: string;
 }
 
+interface RepoErrorInfo {
+  message: string;
+  ssoUrl?: string;
+}
+
 interface IssueWithJulesStatus extends GitHubIssue {
   julesStatus?: string;
   julesUrl?: string;
@@ -67,7 +72,7 @@ function App() {
   const [issues, setIssues] = useState<IssueWithJulesStatus[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
-  const [repoErrors, setRepoErrors] = useState<Record<string, string>>({});
+  const [repoErrors, setRepoErrors] = useState<Record<string, RepoErrorInfo>>({});
   const [ghToken, setGhToken] = useState<string>(localStorage.getItem('github_token') || '');
   const [julesToken, setJulesToken] = useState<string>(localStorage.getItem('jules_token') || '');
   const [julesApiBase, setJulesApiBase] = useState<string>(localStorage.getItem('jules_api_base') || DEFAULT_JULES_API_BASE);
@@ -179,7 +184,7 @@ function App() {
     repo: string,
     filterState: string,
     headers: HeadersInit,
-    onRepoError?: (repo: string, message: string) => void
+    onRepoError?: (repo: string, error: RepoErrorInfo) => void
   ): Promise<GitHubIssue[]> => {
     // Check if we are in a test environment (e.g., Playwright)
     const isTest = window.location.search.includes('test=true') || (window as any).isTest;
@@ -199,13 +204,21 @@ function App() {
         if (!response.ok) {
           if (page === 1) {
             let message = `Failed to fetch: ${response.status} ${response.statusText}`;
+            let ssoUrl = undefined;
             if (response.status === 404) {
               message = 'Repository not found. If it is private, ensure your PAT has "repo" or "Issues" read scope.';
             } else if (response.status === 403) {
               message = 'Access forbidden. If this is an organization repo, you may need to authorize SAML SSO for your PAT.';
+              const ssoHeader = response.headers.get('X-GitHub-SSO');
+              if (ssoHeader) {
+                const match = ssoHeader.match(/url=([^;]+)/);
+                if (match) {
+                  ssoUrl = match[1];
+                }
+              }
             }
             console.error(`Error for ${repo}: ${message}`);
-            onRepoError?.(repo, message);
+            onRepoError?.(repo, { message, ssoUrl });
           }
           return [];
         }
@@ -446,8 +459,8 @@ function App() {
           }
 
           const allReposResults = await Promise.all(
-            effectiveRepoList.map(repo => fetchRawIssues(repo, filterState, headers, (r, msg) => {
-              setRepoErrors(prev => ({ ...prev, [r]: msg }));
+            effectiveRepoList.map(repo => fetchRawIssues(repo, filterState, headers, (r, err) => {
+              setRepoErrors(prev => ({ ...prev, [r]: err }));
             }))
           );
 
@@ -839,9 +852,21 @@ function App() {
             <p>Issues from these repositories are missing from the dashboard.</p>
           </div>
           <ul>
-            {Object.entries(repoErrors).map(([repo, msg]) => (
-              <li key={repo}>
-                <strong>{repo}:</strong> {msg}
+            {Object.entries(repoErrors).map(([repo, err]) => (
+              <li key={repo} className="repo-error-item">
+                <div className="repo-error-text">
+                  <strong>{repo}:</strong> {err.message}
+                </div>
+                {err.ssoUrl && (
+                  <a
+                    href={err.ssoUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="btn-action btn-authorize"
+                  >
+                    Authorize
+                  </a>
+                )}
               </li>
             ))}
           </ul>
