@@ -56,7 +56,9 @@ const sanitizeRepoName = (input: string): string => {
   // Take only owner/repo
   const parts = cleaned.split('/');
   if (parts.length >= 2) {
-    return `${parts[0]}/${parts[1]}`;
+    let repoName = parts[1];
+    repoName = repoName.replace(/\.git$/i, '');
+    return `${parts[0]}/${repoName}`;
   }
   return cleaned;
 };
@@ -65,6 +67,7 @@ function App() {
   const [issues, setIssues] = useState<IssueWithJulesStatus[]>([]);
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
+  const [repoErrors, setRepoErrors] = useState<Record<string, string>>({});
   const [ghToken, setGhToken] = useState<string>(localStorage.getItem('github_token') || '');
   const [julesToken, setJulesToken] = useState<string>(localStorage.getItem('jules_token') || '');
   const [julesApiBase, setJulesApiBase] = useState<string>(localStorage.getItem('jules_api_base') || DEFAULT_JULES_API_BASE);
@@ -147,7 +150,37 @@ function App() {
       .join(' ');
   };
 
-  const fetchRawIssues = async (repo: string, filterState: string, headers: HeadersInit): Promise<GitHubIssue[]> => {
+  const fetchAllUserRepos = async (headers: HeadersInit): Promise<string[]> => {
+    let allRepos: string[] = [];
+    let url = 'https://api.github.com/user/repos?sort=updated&per_page=100';
+
+    while (url) {
+      try {
+        const response = await fetch(url, { headers });
+        if (!response.ok) {
+          console.error('Failed to fetch user repositories', response.statusText);
+          break;
+        }
+        const repos: any[] = await response.json();
+        allRepos = [...allRepos, ...repos.map(r => r.full_name)];
+
+        const linkHeader = response.headers.get('Link');
+        const nextMatch = linkHeader?.match(/<([^>]+)>;\s*rel="next"/);
+        url = nextMatch ? nextMatch[1] : '';
+      } catch (err) {
+        console.error('Error fetching user repositories:', err);
+        break;
+      }
+    }
+    return allRepos;
+  };
+
+  const fetchRawIssues = async (
+    repo: string,
+    filterState: string,
+    headers: HeadersInit,
+    onRepoError?: (repo: string, message: string) => void
+  ): Promise<GitHubIssue[]> => {
     // Check if we are in a test environment (e.g., Playwright)
     const isTest = window.location.search.includes('test=true') || (window as any).isTest;
     const pages = isTest ? [1] : [1, 2, 3];
@@ -155,10 +188,25 @@ function App() {
       try {
         const response = await fetch(
           `https://api.github.com/repos/${repo}/issues?state=${filterState}&per_page=100&page=${page}`,
-          { headers }
+          {
+            headers: {
+              ...headers,
+              'Accept': 'application/vnd.github+json',
+              'X-GitHub-Api-Version': '2022-11-28'
+            }
+          }
         );
         if (!response.ok) {
-          if (page === 1) console.error(`Failed to fetch from ${repo}`);
+          if (page === 1) {
+            let message = `Failed to fetch: ${response.status} ${response.statusText}`;
+            if (response.status === 404) {
+              message = 'Repository not found. If it is private, ensure your PAT has "repo" or "Issues" read scope.';
+            } else if (response.status === 403) {
+              message = 'Access forbidden. If this is an organization repo, you may need to authorize SAML SSO for your PAT.';
+            }
+            console.error(`Error for ${repo}: ${message}`);
+            onRepoError?.(repo, message);
+          }
           return [];
         }
         const data: unknown = await response.json();
@@ -198,7 +246,13 @@ function App() {
 
   const fetchSessionIdFromComments = async (repo: string, issueNumber: number, headers: HeadersInit): Promise<string | undefined> => {
     try {
-      const response = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/comments?per_page=100`, { headers });
+      const response = await fetch(`https://api.github.com/repos/${repo}/issues/${issueNumber}/comments?per_page=100`, {
+        headers: {
+          ...headers,
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28'
+        }
+      });
       if (!response.ok) return undefined;
       const comments: any[] = await response.json();
 
@@ -370,8 +424,12 @@ function App() {
     const fetchIssues = async () => {
       setLoading(true);
       setError(null);
+      setRepoErrors({});
       try {
-        const headers: HeadersInit = {};
+        const headers: HeadersInit = {
+          'Accept': 'application/vnd.github+json',
+          'X-GitHub-Api-Version': '2022-11-28'
+        };
         if (ghToken) {
           headers['Authorization'] = `Bearer ${ghToken}`;
         }
@@ -384,19 +442,13 @@ function App() {
         } else {
           let effectiveRepoList = [...repoHistory];
           if (effectiveRepoList.length === 0 && ghToken) {
-            try {
-              const response = await fetch('https://api.github.com/user/repos?sort=updated&per_page=100', { headers });
-              if (response.ok) {
-                const repos: any[] = await response.json();
-                effectiveRepoList = repos.map(r => r.full_name);
-              }
-            } catch (err) {
-              console.error('Failed to fetch user repositories', err);
-            }
+            effectiveRepoList = await fetchAllUserRepos(headers);
           }
 
           const allReposResults = await Promise.all(
-            effectiveRepoList.map(repo => fetchRawIssues(repo, filterState, headers))
+            effectiveRepoList.map(repo => fetchRawIssues(repo, filterState, headers, (r, msg) => {
+              setRepoErrors(prev => ({ ...prev, [r]: msg }));
+            }))
           );
 
           const filteredReposResults = allReposResults.map(repoIssues => {
@@ -414,7 +466,13 @@ function App() {
           const prMetadataMap = new Map<string, string>();
           await Promise.all(effectiveRepoList.map(async (repo) => {
             try {
-              const response = await fetch(`https://api.github.com/repos/${repo}/pulls?state=all&per_page=100`, { headers });
+              const response = await fetch(`https://api.github.com/repos/${repo}/pulls?state=all&per_page=100`, {
+                headers: {
+                  ...headers,
+                  'Accept': 'application/vnd.github+json',
+                  'X-GitHub-Api-Version': '2022-11-28'
+                }
+              });
               if (response.ok) {
                 const prs: any[] = await response.json();
                 prs.forEach(pr => {
@@ -582,7 +640,13 @@ function App() {
                     try {
                       const filesResponse = await fetch(
                         `https://api.github.com/repos/${target.repository.full_name}/pulls/${target.number}/files`,
-                        { headers }
+                        {
+                          headers: {
+                            ...headers,
+                            'Accept': 'application/vnd.github+json',
+                            'X-GitHub-Api-Version': '2022-11-28'
+                          }
+                        }
                       );
                       if (filesResponse.ok) {
                         const filesData: any[] = await filesResponse.json();
@@ -605,7 +669,13 @@ function App() {
                     if (sha) {
                       const checkRunsResponse = await fetch(
                         `https://api.github.com/repos/${target.repository.full_name}/commits/${sha}/check-runs`,
-                        { headers }
+                        {
+                          headers: {
+                            ...headers,
+                            'Accept': 'application/vnd.github+json',
+                            'X-GitHub-Api-Version': '2022-11-28'
+                          }
+                        }
                       );
                       if (checkRunsResponse.ok) {
                         const checkRunsData: any = await checkRunsResponse.json();
@@ -760,6 +830,25 @@ function App() {
             <button className="btn-cancel" onClick={() => setShowSettings(false)}>Cancel</button>
           </div>
         </section>
+      )}
+
+      {Object.keys(repoErrors).length > 0 && (
+        <div className="repo-error-banner">
+          <div className="repo-error-header">
+            <strong>Warning: Some repositories failed to load</strong>
+            <p>Issues from these repositories are missing from the dashboard.</p>
+          </div>
+          <ul>
+            {Object.entries(repoErrors).map(([repo, msg]) => (
+              <li key={repo}>
+                <strong>{repo}:</strong> {msg}
+              </li>
+            ))}
+          </ul>
+          <p className="repo-error-footer">
+            See <a href="https://github.com/chatelao/AI-Dashboard/blob/main/HOWTO_ENABLE_PRIVATE.md" target="_blank" rel="noopener noreferrer">HOWTO_ENABLE_PRIVATE.md</a> for setup instructions.
+          </p>
+        </div>
       )}
 
       <main>

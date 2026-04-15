@@ -537,3 +537,54 @@ a:hover {
 .btn-merge:hover:not(:disabled) {
   background-color: #2ea043;
 }
+
+.repo-error-banner {
+  background-color: rgba(248, 81, 73, 0.1);
+  border: 1px solid rgba(248, 81, 73, 0.4);
+  border-radius: 8px;
+  padding: 1rem;
+  margin-bottom: 1.5rem;
+  text-align: left;
+  color: #f85149;
+}
+
+.repo-error-header {
+  margin-bottom: 0.5rem;
+}
+
+.repo-error-header strong {
+  display: block;
+  font-size: 1.1rem;
+  margin-bottom: 0.2rem;
+}
+
+.repo-error-header p {
+  margin: 0;
+  font-size: 0.9rem;
+  opacity: 0.8;
+}
+
+.repo-error-banner ul {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+  font-size: 0.9rem;
+}
+
+.repo-error-banner li {
+  margin-bottom: 0.3rem;
+}
+
+.repo-error-banner li strong {
+  color: #f85149;
+}
+
+.repo-error-footer {
+  margin: 0.5rem 0 0 0;
+  font-size: 0.85rem;
+  color: #8b949e;
+}
+
+.repo-error-footer a {
+  color: #58a6ff;
+  text-decoration: underline;
+}
