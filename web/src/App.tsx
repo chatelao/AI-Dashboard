@@ -45,6 +45,21 @@ interface IssueWithJulesStatus extends GitHubIssue {
 }
 
 const DEFAULT_JULES_API_BASE = 'https://jules.googleapis.com/v1alpha';
+const DEFAULT_REPOS = ['chatelao/AI-Dashboard', 'chatelao/swisscarport-admin'];
+
+const sanitizeRepoName = (input: string): string => {
+  let cleaned = input.trim();
+  // Remove https://github.com/ if present
+  cleaned = cleaned.replace(/^https?:\/\/github\.com\//i, '');
+  // Remove leading slash if present
+  cleaned = cleaned.replace(/^\//, '');
+  // Take only owner/repo
+  const parts = cleaned.split('/');
+  if (parts.length >= 2) {
+    return `${parts[0]}/${parts[1]}`;
+  }
+  return cleaned;
+};
 
 function App() {
   const [issues, setIssues] = useState<IssueWithJulesStatus[]>([]);
@@ -60,7 +75,19 @@ function App() {
 
   const [repoHistory, setRepoHistory] = useState<string[]>(() => {
     const saved = localStorage.getItem('gh_repos');
-    return saved ? JSON.parse(saved) : ['chatelao/AI-Dashboard'];
+    if (saved) {
+      try {
+        const repos: string[] = JSON.parse(saved).map(sanitizeRepoName).filter((r: string) => r.length > 0);
+        // Migration: if they only have the old default, upgrade them to the new default list
+        if (repos.length === 1 && repos[0] === 'chatelao/AI-Dashboard') {
+          return DEFAULT_REPOS;
+        }
+        return repos;
+      } catch (e) {
+        console.error('Failed to parse gh_repos from localStorage', e);
+      }
+    }
+    return DEFAULT_REPOS;
   });
   const [draftRepoHistory, setDraftRepoHistory] = useState<string>(repoHistory.join(', '));
 
@@ -239,7 +266,10 @@ function App() {
   };
 
   const handleSaveSettings = () => {
-    const newRepos = draftRepoHistory.split(',').map(r => r.trim()).filter(r => r.length > 0);
+    const newRepos = draftRepoHistory
+      .split(',')
+      .map(sanitizeRepoName)
+      .filter(r => r.length > 0);
     localStorage.setItem('github_token', draftGhToken);
     localStorage.setItem('jules_token', draftJulesToken);
     localStorage.setItem('jules_api_base', draftJulesApiBase);
