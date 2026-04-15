@@ -538,6 +538,22 @@ a:hover {
   background-color: #2ea043;
 }
 
+.btn-sso {
+  background-color: #238636;
+  color: #ffffff;
+  border-color: rgba(240, 246, 252, 0.1);
+  text-decoration: none !important;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-left: 0;
+}
+
+.btn-sso:hover {
+  background-color: #2ea043;
+  color: #ffffff;
+}
+
 .repo-error-banner {
   background-color: rgba(248, 81, 73, 0.1);
   border: 1px solid rgba(248, 81, 73, 0.4);

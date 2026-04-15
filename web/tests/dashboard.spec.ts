@@ -357,4 +357,72 @@ test.describe('Dashboard Consolidation', () => {
     // Verify Issue 401 status
     await expect(issueRow.locator('td').nth(3)).toContainText('completed', { ignoreCase: true });
   });
+
+  test('should display Authorize button when SAML SSO is required', async ({ page }) => {
+    const repo = 'org/private-repo';
+
+    // Mock GitHub Issues API with 403 and X-GitHub-SSO header
+    await page.route(`**/repos/${repo}/issues*`, async (route) => {
+      await route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        headers: {
+          'X-GitHub-SSO': 'required; url=https://github.com/orgs/org/sso?authorization_request=XYZ',
+          'Access-Control-Expose-Headers': 'X-GitHub-SSO'
+        },
+        body: JSON.stringify({
+          message: 'Resource protected by organization SAML enforcement. You must grant your personal access token access to this organization.',
+          documentation_url: 'https://docs.github.com/articles/authenticating-with-saml-single-sign-on/'
+        })
+      });
+    });
+
+    // Set repo in localStorage
+    await page.addInitScript((repo) => {
+      window.localStorage.setItem('gh_repos', JSON.stringify([repo]));
+    }, repo);
+
+    await page.goto('/?test=true');
+
+    // Verify error banner exists
+    const errorBanner = page.locator('.repo-error-banner');
+    await expect(errorBanner).toBeVisible();
+
+    // Verify repo-specific error message
+    const repoError = errorBanner.locator('li').filter({ hasText: repo });
+    await expect(repoError).toContainText('Resource protected by organization SAML enforcement');
+
+    // Verify Authorize button exists and has correct URL
+    const authButton = repoError.locator('a.btn-sso');
+    await expect(authButton).toBeVisible();
+    await expect(authButton).toHaveAttribute('href', 'https://github.com/orgs/org/sso?authorization_request=XYZ');
+    await expect(authButton).toHaveText('Authorize');
+  });
+
+  test('should display detailed error message for rate limit errors', async ({ page }) => {
+    const repo = 'chatelao/AI-Dashboard';
+
+    // Mock GitHub Issues API with 403 Rate Limit
+    await page.route(`**/repos/${repo}/issues*`, async (route) => {
+      await route.fulfill({
+        status: 403,
+        contentType: 'application/json',
+        body: JSON.stringify({
+          message: "API rate limit exceeded for user ID 12345. If you reach out to GitHub Support, please include this entire message and the following: 123:456:789",
+          documentation_url: "https://docs.github.com/rest/overview/resources-in-the-rest-api#rate-limiting"
+        })
+      });
+    });
+
+    await page.goto('/?test=true');
+
+    // Verify error banner exists
+    const errorBanner = page.locator('.repo-error-banner');
+    await expect(errorBanner).toBeVisible();
+
+    // Verify detailed rate limit message is shown
+    const repoError = errorBanner.locator('li').filter({ hasText: repo });
+    await expect(repoError).toContainText('API rate limit exceeded');
+    await expect(repoError).toContainText('user ID 12345');
+  });
 });
