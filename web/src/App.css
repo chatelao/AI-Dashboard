@@ -586,12 +586,19 @@ a:hover {
   flex: 1;
 }
 
+.help-text {
+  display: block;
+  margin-top: 5px;
+  font-size: 0.8rem;
+  color: #8b949e;
+}
+
 .btn-authorize {
   background-color: #238636;
   color: #ffffff !important;
   border-color: rgba(240, 246, 252, 0.1);
   text-decoration: none !important;
-  margin-left: 0;
+  margin-left: 10px;
   display: inline-block;
 }
 

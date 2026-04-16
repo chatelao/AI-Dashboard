@@ -216,6 +216,9 @@ function App() {
                   ssoUrl = match[1];
                 }
               }
+              if (!ssoUrl) {
+                ssoUrl = 'https://github.com/settings/tokens';
+              }
             }
             console.error(`Error for ${repo}: ${message}`);
             onRepoError?.(repo, { message, ssoUrl });
@@ -803,6 +806,9 @@ function App() {
               onChange={(e) => setDraftGhToken(e.target.value)}
               placeholder="ghp_..."
             />
+            <small className="help-text">
+              If you are using organization repositories, you may need to <a href="https://github.com/settings/tokens" target="_blank" rel="noopener noreferrer">Configure SAML SSO</a> for your token.
+            </small>
           </div>
           <div className="settings-group">
             <label htmlFor="jules-token">Jules API Token:</label>
