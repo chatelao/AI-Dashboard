@@ -103,6 +103,22 @@ h1 {
   box-shadow: 0 0 0 3px rgba(88, 166, 255, 0.3);
 }
 
+.checkbox-group {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.checkbox-group input {
+  width: auto;
+  margin: 0;
+}
+
+.checkbox-group label {
+  margin: 0;
+  cursor: pointer;
+}
+
 .settings-actions {
   display: flex;
   gap: 12px;

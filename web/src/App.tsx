@@ -76,9 +76,11 @@ function App() {
   const [ghToken, setGhToken] = useState<string>(localStorage.getItem('github_token') || '');
   const [julesToken, setJulesToken] = useState<string>(localStorage.getItem('jules_token') || '');
   const [julesApiBase, setJulesApiBase] = useState<string>(localStorage.getItem('jules_api_base') || DEFAULT_JULES_API_BASE);
+  const [ignoreFailingRepos, setIgnoreFailingRepos] = useState<boolean>(localStorage.getItem('ignore_failing_repos') === 'true');
   const [draftGhToken, setDraftGhToken] = useState<string>(ghToken);
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [draftJulesApiBase, setDraftJulesApiBase] = useState<string>(julesApiBase);
+  const [draftIgnoreFailingRepos, setDraftIgnoreFailingRepos] = useState<boolean>(ignoreFailingRepos);
   const [showSettings, setShowSettings] = useState<boolean>(false);
 
   const [repoHistory, setRepoHistory] = useState<string[]>(() => {
@@ -123,8 +125,9 @@ function App() {
       setDraftJulesToken(julesToken);
       setDraftJulesApiBase(julesApiBase);
       setDraftRepoHistory(repoHistory.join(', '));
+      setDraftIgnoreFailingRepos(ignoreFailingRepos);
     }
-  }, [showSettings, ghToken, julesToken, julesApiBase, repoHistory]);
+  }, [showSettings, ghToken, julesToken, julesApiBase, repoHistory, ignoreFailingRepos]);
 
   useEffect(() => {
     const handleVisibilityChange = () => {
@@ -344,10 +347,12 @@ function App() {
     localStorage.setItem('jules_token', draftJulesToken);
     localStorage.setItem('jules_api_base', draftJulesApiBase);
     localStorage.setItem('gh_repos', JSON.stringify(newRepos));
+    localStorage.setItem('ignore_failing_repos', String(draftIgnoreFailingRepos));
     setGhToken(draftGhToken);
     setJulesToken(draftJulesToken);
     setJulesApiBase(draftJulesApiBase);
     setRepoHistory(newRepos);
+    setIgnoreFailingRepos(draftIgnoreFailingRepos);
     setShowSettings(false);
     setRefreshTrigger(prev => prev + 1);
   };
@@ -423,14 +428,17 @@ function App() {
     localStorage.removeItem('jules_token');
     localStorage.removeItem('jules_api_base');
     localStorage.removeItem('gh_repos');
+    localStorage.removeItem('ignore_failing_repos');
     setGhToken('');
     setJulesToken('');
     setJulesApiBase(DEFAULT_JULES_API_BASE);
     setRepoHistory([]);
+    setIgnoreFailingRepos(false);
     setDraftGhToken('');
     setDraftJulesToken('');
     setDraftJulesApiBase(DEFAULT_JULES_API_BASE);
     setDraftRepoHistory('');
+    setDraftIgnoreFailingRepos(false);
     setShowSettings(false);
     setRefreshTrigger(prev => prev + 1);
   };
@@ -843,6 +851,15 @@ function App() {
               placeholder="owner/repo, owner2/repo2 (leave empty to track all your repos)"
             />
           </div>
+          <div className="settings-group checkbox-group">
+            <input
+              id="ignore-failing-repos"
+              type="checkbox"
+              checked={draftIgnoreFailingRepos}
+              onChange={(e) => setDraftIgnoreFailingRepos(e.target.checked)}
+            />
+            <label htmlFor="ignore-failing-repos">Ignore failing repository accesses</label>
+          </div>
           <div className="settings-actions">
             <button className="btn-save" onClick={handleSaveSettings}>Save & Reload</button>
             <button className="btn-clear" onClick={handleClearSettings}>Clear All</button>
@@ -851,7 +868,7 @@ function App() {
         </section>
       )}
 
-      {Object.keys(repoErrors).length > 0 && (
+      {Object.keys(repoErrors).length > 0 && !ignoreFailingRepos && (
         <div className="repo-error-banner">
           <div className="repo-error-header">
             <strong>Warning: Some repositories failed to load</strong>
