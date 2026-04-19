@@ -4,6 +4,8 @@ on:
   push:
     branches:
       - main
+      - main-new
+      - jules-*
   workflow_dispatch:
 
 permissions:
