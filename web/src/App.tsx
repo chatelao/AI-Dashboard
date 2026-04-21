@@ -68,11 +68,39 @@ function App() {
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState<string>('');
 
   const allConsolidatedIssuesRef = useRef<IssueWithJulesStatus[]>([]);
+  const currentEnrichedIssuesRef = useRef<IssueWithJulesStatus[]>([]);
   const lastFetchKeyRef = useRef<string>('');
+  const lastAutoRefreshRef = useRef<number>(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     searchInputRef.current?.focus();
+  }, []);
+
+  useEffect(() => {
+    const handleRefresh = () => {
+      const isTest = window.location.search.includes('test=true') || (window as any).isTest;
+      if (isTest) return;
+
+      const now = Date.now();
+      if (now - lastAutoRefreshRef.current > 30000) { // 30 seconds throttle
+        lastAutoRefreshRef.current = now;
+        setRefreshTrigger(prev => prev + 1);
+      }
+    };
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        handleRefresh();
+      }
+    };
+
+    window.addEventListener('visibilitychange', onVisibilityChange);
+    window.addEventListener('focus', handleRefresh);
+    return () => {
+      window.removeEventListener('visibilitychange', onVisibilityChange);
+      window.removeEventListener('focus', handleRefresh);
+    };
   }, []);
 
   useEffect(() => {
@@ -320,7 +348,9 @@ function App() {
   useEffect(() => {
     let isCancelled = false;
     const fetchIssues = async () => {
-      setLoading(true);
+      if (issues.length === 0) {
+        setLoading(true);
+      }
       setError(null);
       try {
         const headers: HeadersInit = {};
@@ -459,29 +489,71 @@ function App() {
             item.assignee?.login?.toLowerCase() === 'google-labs-jules[bot]' ||
             item.labels.some(l => l.name.toLowerCase() === 'jules')
           );
-          return {
+
+          // Find existing enriched issue to preserve state
+          const existing = currentEnrichedIssuesRef.current.find(i => i.id === item.id);
+          const enrichedItem: IssueWithJulesStatus = {
             ...item,
             isJules,
-            enrichingJules: isJules && !!julesToken,
-            enrichingPR: !!item.pull_request || (item.linkedPRs && item.linkedPRs.length > 0),
-            linkedPRs: item.linkedPRs?.map(pr => ({
-              ...pr,
-              isJules: (
-                pr.assignee?.login?.toLowerCase() === 'jules' ||
-                pr.assignee?.login?.toLowerCase() === 'google-labs-jules[bot]' ||
-                pr.labels.some(l => l.name.toLowerCase() === 'jules')
-              ),
-              enrichingJules: (
-                pr.assignee?.login?.toLowerCase() === 'jules' ||
-                pr.assignee?.login?.toLowerCase() === 'google-labs-jules[bot]' ||
-                pr.labels.some(l => l.name.toLowerCase() === 'jules')
-              ) && !!julesToken,
-              enrichingPR: true
-            }))
           };
+
+          if (existing) {
+            // Selectively preserve enrichment state
+            if (existing.julesStatus) {
+              enrichedItem.julesStatus = existing.julesStatus;
+              enrichedItem.julesUrl = existing.julesUrl;
+            }
+            if (existing.prStatus) enrichedItem.prStatus = existing.prStatus;
+            if (existing.mergeable !== undefined) enrichedItem.mergeable = existing.mergeable;
+            if (existing.mergeable_state) enrichedItem.mergeable_state = existing.mergeable_state;
+            if (existing.prFilesCount !== undefined) enrichedItem.prFilesCount = existing.prFilesCount;
+            if (existing.prFileExtensions) enrichedItem.prFileExtensions = existing.prFileExtensions;
+            if (existing.actionLoading) enrichedItem.actionLoading = existing.actionLoading;
+          }
+
+          // Update linked PRs from existing if they match
+          if (item.linkedPRs) {
+            enrichedItem.linkedPRs = item.linkedPRs.map(pr => {
+              const existingPr = existing?.linkedPRs?.find(epr => epr.id === pr.id);
+              const isPrJules = (
+                pr.assignee?.login?.toLowerCase() === 'jules' ||
+                pr.assignee?.login?.toLowerCase() === 'google-labs-jules[bot]' ||
+                pr.labels.some(l => l.name.toLowerCase() === 'jules')
+              );
+              const enrichedPr: IssueWithJulesStatus = {
+                ...pr,
+                isJules: isPrJules,
+              };
+
+              if (existingPr) {
+                if (existingPr.julesStatus) {
+                  enrichedPr.julesStatus = existingPr.julesStatus;
+                  enrichedPr.julesUrl = existingPr.julesUrl;
+                }
+                if (existingPr.prStatus) enrichedPr.prStatus = existingPr.prStatus;
+                if (existingPr.mergeable !== undefined) enrichedPr.mergeable = existingPr.mergeable;
+                if (existingPr.mergeable_state) enrichedPr.mergeable_state = existingPr.mergeable_state;
+                if (existingPr.prFilesCount !== undefined) enrichedPr.prFilesCount = existingPr.prFilesCount;
+                if (existingPr.prFileExtensions) enrichedPr.prFileExtensions = existingPr.prFileExtensions;
+                if (existingPr.actionLoading) enrichedPr.actionLoading = existingPr.actionLoading;
+              }
+
+              enrichedPr.enrichingJules = isPrJules && !!julesToken && !enrichedPr.julesStatus;
+              enrichedPr.enrichingPR = !enrichedPr.prStatus;
+              return enrichedPr;
+            });
+          }
+
+          // Set enrichment flags
+          enrichedItem.enrichingJules = isJules && !!julesToken && !enrichedItem.julesStatus;
+          enrichedItem.enrichingPR = (!!item.pull_request && !enrichedItem.prStatus) ||
+            (item.linkedPRs && item.linkedPRs.length > 0 && enrichedItem.linkedPRs?.some(pr => !pr.prStatus));
+
+          return enrichedItem;
         });
 
         setIssues(visibleIssues);
+        currentEnrichedIssuesRef.current = visibleIssues;
         setLoading(false);
 
         // Background Enrichment
@@ -601,7 +673,11 @@ function App() {
             item.enrichingPR = false;
 
             // Update state incrementally
-            setIssues(prev => prev.map(i => i.id === item.id ? { ...item } : i));
+            setIssues(prev => {
+              const next = prev.map(i => i.id === item.id ? { ...item } : i);
+              currentEnrichedIssuesRef.current = next;
+              return next;
+            });
           } finally {
             activeRequests--;
             processQueue();
