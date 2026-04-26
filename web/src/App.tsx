@@ -42,6 +42,9 @@ interface IssueWithJulesStatus extends GitHubIssue {
   actionLoading?: boolean;
   prFilesCount?: number;
   prFileExtensions?: string[];
+  prAdditions?: number;
+  prDeletions?: number;
+  prFileStats?: Record<string, { filenames: string[], additions: number, deletions: number }>;
 }
 
 const DEFAULT_JULES_API_BASE = 'https://jules.googleapis.com/v1alpha';
@@ -128,6 +131,64 @@ function App() {
 
   const formatJulesStatus = (status: string) => {
     return status === 'in-progress' ? 'InProgress' : status.replace(/-/g, ' ');
+  };
+
+  const renderFileInfo = (item: IssueWithJulesStatus) => {
+    if (item.prFilesCount === undefined) return null;
+    return (
+      <span className="pr-files-info">
+        {' '}
+        (
+        <span className="tooltip">
+          {item.prFilesCount} {item.prFilesCount === 1 ? 'file' : 'files'}
+          {(item.prAdditions !== undefined || item.prDeletions !== undefined) && (
+            <span className="tooltip-text">
+              Total: <span className="additions-text">+{item.prAdditions || 0}</span>{' '}
+              <span className="deletions-text">-{item.prDeletions || 0}</span>
+            </span>
+          )}
+        </span>
+        {item.prFileExtensions && item.prFileExtensions.length > 0 && (
+          <>
+            {', '}
+            {item.prFileExtensions.map((ext, idx) => (
+              <span key={ext}>
+                <span className="tooltip">
+                  {ext}
+                  {item.prFileStats && item.prFileStats[ext] && (
+                    <span className="tooltip-text">
+                      <span className="tooltip-stats">
+                        <span className="additions-text">+{item.prFileStats[ext].additions}</span>{' '}
+                        <span className="deletions-text">-{item.prFileStats[ext].deletions}</span>
+                      </span>
+                      <div className="tooltip-filenames">
+                        {item.prFileStats[ext].filenames.join('\n')}
+                      </div>
+                    </span>
+                  )}
+                </span>
+                {idx < (item.prFileExtensions?.length || 0) - 1 ? ', ' : ''}
+              </span>
+            ))}
+          </>
+        )}
+        )
+      </span>
+    );
+  };
+
+  const renderPRNumberTooltip = (item: IssueWithJulesStatus, includeLabel: boolean = true) => {
+    return (
+      <span className="tooltip">
+        <span className="pr-number">{includeLabel ? 'PR ' : ''}#{item.number}:</span>
+        {' '}
+        {item.body && (
+          <span className="tooltip-text">
+            {item.body.length > 500 ? item.body.substring(0, 500) + '...' : item.body}
+          </span>
+        )}
+      </span>
+    );
   };
 
   const fetchRawIssues = async (repo: string, filterState: string, headers: HeadersInit): Promise<GitHubIssue[]> => {
@@ -601,6 +662,8 @@ function App() {
                     const prDetail: any = await prResponse.json();
                     target.mergeable = prDetail.mergeable;
                     target.mergeable_state = prDetail.mergeable_state;
+                    target.prAdditions = prDetail.additions;
+                    target.prDeletions = prDetail.deletions;
 
                     // Fetch PR files to get count and extensions
                     try {
@@ -611,14 +674,19 @@ function App() {
                       if (filesResponse.ok) {
                         const filesData: any[] = await filesResponse.json();
                         target.prFilesCount = filesData.length;
-                        const extensions = new Set<string>();
+                        const stats: Record<string, { filenames: string[], additions: number, deletions: number }> = {};
                         filesData.forEach(file => {
                           const parts = file.filename.split('.');
-                          if (parts.length > 1) {
-                            extensions.add(`.${parts.pop()}`);
+                          const ext = parts.length > 1 ? `.${parts.pop()}` : 'no-ext';
+                          if (!stats[ext]) {
+                            stats[ext] = { filenames: [], additions: 0, deletions: 0 };
                           }
+                          stats[ext].filenames.push(file.filename);
+                          stats[ext].additions += (file.additions || 0);
+                          stats[ext].deletions += (file.deletions || 0);
                         });
-                        target.prFileExtensions = Array.from(extensions);
+                        target.prFileStats = stats;
+                        target.prFileExtensions = Object.keys(stats);
                       }
                     } catch (err) {
                       console.error(`Failed to fetch files for PR #${target.number}`, err);
@@ -819,23 +887,16 @@ function App() {
                             <span className="repo-tag">[{issue.repository.full_name.split('/')[1]}]</span>
                           </a>{' '}
                           <a href={issue.html_url} target="_blank" rel="noopener noreferrer">
+                            {issue.pull_request && renderPRNumberTooltip(issue, false)}
                             {issue.title}
-                            {issue.prFilesCount !== undefined && (
-                              <span className="pr-files-info">
-                                {' '}({issue.prFilesCount} {issue.prFilesCount === 1 ? 'file' : 'files'}{issue.prFileExtensions && issue.prFileExtensions.length > 0 ? `, ${issue.prFileExtensions.join(', ')}` : ''})
-                              </span>
-                            )}
+                            {renderFileInfo(issue)}
                           </a>
                         </div>
                         {issue.linkedPRs && issue.linkedPRs.map(pr => (
                           <div key={pr.id} className="subtitle">
                             <a href={pr.html_url} target="_blank" rel="noopener noreferrer">
-                              <span className="pr-number">PR #{pr.number}:</span> {pr.title}
-                              {pr.prFilesCount !== undefined && (
-                                <span className="pr-files-info">
-                                  {' '}({pr.prFilesCount} {pr.prFilesCount === 1 ? 'file' : 'files'}{pr.prFileExtensions && pr.prFileExtensions.length > 0 ? `, ${pr.prFileExtensions.join(', ')}` : ''})
-                                </span>
-                              )}
+                              {renderPRNumberTooltip(pr)} {pr.title}
+                              {renderFileInfo(pr)}
                             </a>
                           </div>
                         ))}

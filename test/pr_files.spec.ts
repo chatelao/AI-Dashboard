@@ -74,6 +74,8 @@ test('displays PR file count and extensions', async ({ page }) => {
   const prRow = page.locator('tr', { hasText: 'PR with files' });
   await expect(prRow).toBeVisible();
 
-  // The text should contain "(3 files, .ts, .tsx)"
-  await expect(prRow).toContainText('(3 files, .ts, .tsx)');
+  // The text should contain "3 files" and the extensions
+  await expect(prRow).toContainText('3 files');
+  await expect(prRow).toContainText('.ts');
+  await expect(prRow).toContainText('.tsx');
 });

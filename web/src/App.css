@@ -538,3 +538,75 @@ a:hover {
 .btn-merge:hover:not(:disabled) {
   background-color: #2ea043;
 }
+
+/* Tooltip container */
+.tooltip {
+  position: relative;
+  display: inline-block;
+  cursor: help;
+}
+
+/* Tooltip text */
+.tooltip .tooltip-text {
+  visibility: hidden;
+  width: max-content;
+  max-width: 400px;
+  background-color: #161b22;
+  color: #c9d1d9;
+  text-align: left;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  padding: 8px 12px;
+  position: absolute;
+  z-index: 100;
+  bottom: 125%;
+  left: 50%;
+  transform: translateX(-50%);
+  opacity: 0;
+  transition: opacity 0.2s;
+  box-shadow: 0 8px 24px rgba(1,4,9,0.2);
+  font-size: 0.8rem;
+  font-weight: normal;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+/* Tooltip arrow */
+.tooltip .tooltip-text::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  margin-left: -5px;
+  border-width: 5px;
+  border-style: solid;
+  border-color: #30363d transparent transparent transparent;
+}
+
+/* Show the tooltip text when you mouse over the tooltip container */
+.tooltip:hover .tooltip-text {
+  visibility: visible;
+  opacity: 1;
+}
+
+.additions-text {
+  color: #3fb950;
+}
+
+.deletions-text {
+  color: #f85149;
+}
+
+.tooltip-stats {
+  display: block;
+  margin-bottom: 4px;
+  font-weight: 600;
+}
+
+.tooltip-filenames {
+  display: block;
+  margin-top: 4px;
+  font-family: ui-monospace, SFMono-Regular, SF Mono, Menlo, Consolas, Liberation Mono, monospace;
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
