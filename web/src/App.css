@@ -644,3 +644,7 @@ a:hover {
   font-size: 0.75rem;
   opacity: 0.9;
 }
+
+.tooltip-filename-row {
+  white-space: nowrap;
+}

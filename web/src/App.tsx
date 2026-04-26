@@ -44,7 +44,18 @@ interface IssueWithJulesStatus extends GitHubIssue {
   prFileExtensions?: string[];
   prAdditions?: number;
   prDeletions?: number;
-  prFileStats?: Record<string, { filenames: string[], additions: number, deletions: number }>;
+  prFileStats?: Record<string, {
+    filenames: string[],
+    additions: number,
+    deletions: number,
+    details: {
+      name: string,
+      additions: number,
+      deletions: number,
+      totalLines: number,
+      status: string
+    }[]
+  }>;
 }
 
 const DEFAULT_JULES_API_BASE = 'https://jules.googleapis.com/v1alpha';
@@ -133,6 +144,99 @@ function App() {
     return status === 'in-progress' ? 'InProgress' : status.replace(/-/g, ' ');
   };
 
+  const renderColoredFilename = (name: string, additions: number, deletions: number, totalLines: number, status: string) => {
+    const L = name.length;
+    if (L === 0) return null;
+
+    let A = additions;
+    let D = deletions;
+    let U = 0;
+
+    if (status === 'added') {
+      U = 0;
+      D = 0;
+    } else if (status === 'removed') {
+      U = 0;
+      A = 0;
+    } else {
+      U = Math.max(0, totalLines - additions);
+    }
+
+    const relevantTotal = A + D + U;
+    if (relevantTotal === 0) return <span className="text-muted">{name}</span>;
+
+    let cA = Math.floor((A / relevantTotal) * L);
+    let cD = Math.floor((D / relevantTotal) * L);
+    let cU = Math.floor((U / relevantTotal) * L);
+
+    // Apply minimums: round >0.0 = 1 letter colored, <100 = 1 letter grey
+    if (A > 0 && cA === 0) cA = 1;
+    if (D > 0 && cD === 0) cD = 1;
+    if (U > 0 && cU === 0) cU = 1;
+
+    // Adjust to match L
+    let currentSum = cA + cD + cU;
+
+    if (currentSum > L) {
+      // Reduce from the largest ones that are above their minimum
+      const counts = [
+        { key: 'U', val: cU, min: U > 0 ? 1 : 0 },
+        { key: 'A', val: cA, min: A > 0 ? 1 : 0 },
+        { key: 'D', val: cD, min: D > 0 ? 1 : 0 }
+      ];
+      while (currentSum > L) {
+        counts.sort((a, b) => b.val - a.val);
+        let reduced = false;
+        for (const count of counts) {
+          if (count.val > count.min) {
+            count.val--;
+            currentSum--;
+            reduced = true;
+            break;
+          }
+        }
+        if (!reduced) break;
+      }
+      cU = counts.find(c => c.key === 'U')!.val;
+      cA = counts.find(c => c.key === 'A')!.val;
+      cD = counts.find(c => c.key === 'D')!.val;
+    }
+
+    if (currentSum < L) {
+      // Increase the largest ones
+      const counts = [
+        { key: 'U', val: cU, weight: U },
+        { key: 'A', val: cA, weight: A },
+        { key: 'D', val: cD, weight: D }
+      ];
+      while (currentSum < L) {
+        counts.sort((a, b) => b.weight - a.weight);
+        counts[0].val++;
+        currentSum++;
+      }
+      cU = counts.find(c => c.key === 'U')!.val;
+      cA = counts.find(c => c.key === 'A')!.val;
+      cD = counts.find(c => c.key === 'D')!.val;
+    }
+
+    const parts = [];
+    let start = 0;
+    if (cA > 0) {
+      parts.push(<span key="a" className="additions-text">{name.substring(start, start + cA)}</span>);
+      start += cA;
+    }
+    if (cD > 0) {
+      parts.push(<span key="d" className="deletions-text">{name.substring(start, start + cD)}</span>);
+      start += cD;
+    }
+    if (cU > 0) {
+      parts.push(<span key="u" className="text-muted">{name.substring(start, start + cU)}</span>);
+      start += cU;
+    }
+
+    return <>{parts}</>;
+  };
+
   const renderFileInfo = (item: IssueWithJulesStatus) => {
     if (item.prFilesCount === undefined) return null;
     return (
@@ -162,7 +266,11 @@ function App() {
                         <span className="deletions-text">-{item.prFileStats[ext].deletions}</span>
                       </span>
                       <div className="tooltip-filenames">
-                        {item.prFileStats[ext].filenames.join('\n')}
+                        {item.prFileStats[ext].details.map((detail, dIdx) => (
+                          <div key={dIdx} className="tooltip-filename-row">
+                            {renderColoredFilename(detail.name, detail.additions, detail.deletions, detail.totalLines, detail.status)}
+                          </div>
+                        ))}
                       </div>
                     </span>
                   )}
@@ -710,17 +818,55 @@ function App() {
                       if (filesResponse.ok) {
                         const filesData: any[] = await filesResponse.json();
                         target.prFilesCount = filesData.length;
-                        const stats: Record<string, { filenames: string[], additions: number, deletions: number }> = {};
-                        filesData.forEach(file => {
+                        const stats: Record<string, {
+                          filenames: string[],
+                          additions: number,
+                          deletions: number,
+                          details: {
+                            name: string,
+                            additions: number,
+                            deletions: number,
+                            totalLines: number,
+                            status: string
+                          }[]
+                        }> = {};
+
+                        await Promise.all(filesData.map(async (file) => {
                           const parts = file.filename.split('.');
                           const ext = parts.length > 1 ? `.${parts.pop()}` : 'no-ext';
                           if (!stats[ext]) {
-                            stats[ext] = { filenames: [], additions: 0, deletions: 0 };
+                            stats[ext] = { filenames: [], additions: 0, deletions: 0, details: [] };
                           }
                           stats[ext].filenames.push(file.filename);
                           stats[ext].additions += (file.additions || 0);
                           stats[ext].deletions += (file.deletions || 0);
-                        });
+
+                          let totalLines = 0;
+                          if (file.status === 'added') {
+                            totalLines = file.additions || 0;
+                          } else if (file.status === 'removed') {
+                            totalLines = file.deletions || 0;
+                          } else if (file.raw_url) {
+                            try {
+                              const rawResponse = await fetch(file.raw_url, { headers });
+                              if (rawResponse.ok) {
+                                const content = await rawResponse.text();
+                                totalLines = content.split('\n').length;
+                              }
+                            } catch (e) {
+                              console.error(`Failed to fetch raw content for ${file.filename}`, e);
+                            }
+                          }
+
+                          stats[ext].details.push({
+                            name: file.filename,
+                            additions: file.additions || 0,
+                            deletions: file.deletions || 0,
+                            totalLines,
+                            status: file.status
+                          });
+                        }));
+
                         target.prFileStats = stats;
                         target.prFileExtensions = Object.keys(stats);
                       }
