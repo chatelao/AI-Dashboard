@@ -503,6 +503,29 @@ a:hover {
   }
 }
 
+.btn-duplicate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  margin-right: 8px;
+  background: none;
+  border: none;
+  color: #8b949e;
+  cursor: pointer;
+  vertical-align: middle;
+  transition: color 0.2s;
+}
+
+.btn-duplicate:hover {
+  color: #58a6ff;
+}
+
+.btn-duplicate:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
 .btn-action {
   padding: 4px 8px;
   font-size: 0.75rem;
