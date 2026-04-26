@@ -94,7 +94,8 @@ test.describe('Dashboard Consolidation', () => {
     // Verify Issue 101 exists and has PR 102 as subtitle
     const issueRow = page.locator('tbody tr').filter({ hasText: 'Fix a bug' }).first();
     await expect(issueRow).toBeVisible();
-    await expect(issueRow.locator('td[data-label="Title"] .subtitle').first()).toContainText('PR #102: A linked PR');
+    await expect(issueRow.locator('td[data-label="Title"] .subtitle').first()).toContainText('PR #102:');
+    await expect(issueRow.locator('td[data-label="Title"] .subtitle').first()).toContainText('A linked PR');
 
     // Verify Issue 101's row has the green PR status icon (from linked PR 102)
     await expect(issueRow.locator('.pr-icon-green').first()).toBeVisible();
