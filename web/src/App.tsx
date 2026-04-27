@@ -32,6 +32,7 @@ interface PRStatus {
 interface IssueWithJulesStatus extends GitHubIssue {
   julesStatus?: string;
   julesUrl?: string;
+  julesTitle?: string;
   prStatus?: PRStatus;
   linkedPRs?: IssueWithJulesStatus[];
   isJules?: boolean;
@@ -409,7 +410,7 @@ function App() {
     return undefined;
   };
 
-  const fetchJulesStatus = async (sessionId: string, token: string): Promise<{ status: string; url?: string } | undefined> => {
+  const fetchJulesStatus = async (sessionId: string, token: string): Promise<{ status: string; url?: string; title?: string } | undefined> => {
     let url;
     // Use the exact session endpoint as requested
     if (julesApiBase.includes('?url=')) {
@@ -446,7 +447,8 @@ function App() {
       if (data && data.state) {
         return {
           status: data.state.replace('STATE_', '').replace(/_/g, '-').toLowerCase(),
-          url: data.url
+          url: data.url,
+          title: data.title
         };
       }
       return undefined;
@@ -832,6 +834,7 @@ function App() {
                   if (result) {
                     target.julesStatus = result.status;
                     target.julesUrl = result.url;
+                    target.julesTitle = result.title;
                   }
                 }
                 target.enrichingJules = false;
@@ -1134,25 +1137,35 @@ function App() {
                       </a>
                     </div>
                     <div className="project-squares">
-                      {openIssues.map(issue => (
-                        <a
-                          key={issue.id}
-                          href={issue.julesUrl || issue.html_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`status-square ${getIssueStatusColor(issue)}`}
-                          title={`#${issue.number}: ${issue.title}`}
-                        ></a>
-                      ))}
-                      {closedIssues.map(issue => (
-                        <a
-                          key={issue.id}
-                          href={issue.julesUrl || issue.html_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`status-square ${getIssueStatusColor(issue)}`}
-                          title={`#${issue.number}: ${issue.title}`}
-                        ></a>
+                      {[...openIssues, ...closedIssues].map(issue => (
+                        <span key={issue.id} className="tooltip">
+                          <a
+                            href={issue.julesUrl || issue.html_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`status-square ${getIssueStatusColor(issue)}`}
+                          ></a>
+                          <span className="tooltip-text">
+                            <strong>#{issue.number}: {issue.title}</strong>
+                            <div className="tooltip-summary-section">
+                              <div className="tooltip-section-header">Summary:</div>
+                              {issue.julesTitle || (issue.body ? (issue.body.length > 300 ? issue.body.substring(0, 300) + '...' : issue.body) : 'No summary available.')}
+                            </div>
+                            {issue.linkedPRs && issue.linkedPRs.length > 0 && (
+                              <div className="tooltip-summary-section">
+                                <div className="tooltip-section-header">Linked PRs:</div>
+                                {issue.linkedPRs.map(pr => (
+                                  <div key={pr.id} className="tooltip-linked-pr-row">
+                                    <div className="tooltip-linked-pr-title">#{pr.number}: {pr.title}</div>
+                                    <div className="tooltip-linked-pr-summary">
+                                      {pr.julesTitle || (pr.body ? (pr.body.length > 150 ? pr.body.substring(0, 150) + '...' : pr.body) : 'No summary available.')}
+                                    </div>
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </span>
+                        </span>
                       ))}
                     </div>
                   </div>

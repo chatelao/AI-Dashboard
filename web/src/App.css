@@ -676,6 +676,39 @@ a:hover {
   white-space: nowrap;
 }
 
+.tooltip-summary-section {
+  margin-top: 8px;
+  border-top: 1px solid #30363d;
+  padding-top: 8px;
+}
+
+.tooltip-section-header {
+  color: #8b949e;
+  margin-bottom: 4px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.tooltip-linked-pr-row {
+  margin-bottom: 8px;
+}
+
+.tooltip-linked-pr-row:last-child {
+  margin-bottom: 0;
+}
+
+.tooltip-linked-pr-title {
+  color: #58a6ff;
+  font-weight: 600;
+}
+
+.tooltip-linked-pr-summary {
+  margin-left: 8px;
+  font-size: 0.75rem;
+  color: #c9d1d9;
+}
+
 /* Project View Styles */
 .project-view {
   background-color: #1a1a1a;
@@ -716,7 +749,9 @@ a:hover {
   width: 24px;
   height: 24px;
   border-radius: 4px;
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
