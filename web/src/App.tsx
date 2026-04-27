@@ -151,7 +151,7 @@ function App() {
     return status === 'in-progress' ? 'InProgress' : status.replace(/-/g, ' ');
   };
 
-  const getIssueStatusColor = (issue: IssueWithJulesStatus): 'purple' | 'red' | 'yellow' | 'green' => {
+  const getIssueStatusColor = (issue: IssueWithJulesStatus): 'purple' | 'red' | 'yellow' | 'green' | 'grey' => {
     if (issue.state === 'closed') return 'purple';
 
     const julesStatus = issue.julesStatus;
@@ -159,18 +159,25 @@ function App() {
 
     // Check linked PRs as well
     const linkedPRs = issue.linkedPRs || [];
-    const allJulesStatuses = [julesStatus, ...linkedPRs.map(pr => pr.julesStatus)].filter(Boolean);
-    const allPRStatuses = [prStatus, ...linkedPRs.map(pr => pr.prStatus)].filter(Boolean);
+    const allJulesStatuses = [julesStatus, ...linkedPRs.map(pr => pr.julesStatus)].filter(Boolean) as string[];
+    const allPRStatuses = [prStatus, ...linkedPRs.map(pr => pr.prStatus)].filter(Boolean) as PRStatus[];
 
     if (allJulesStatuses.includes('failed') || allPRStatuses.some(ps => ps?.color === 'red')) {
       return 'red';
     }
 
     if (
-      allJulesStatuses.some(s => ['in-progress', 'researching', 'planning', 'coding', 'testing'].includes(s!)) ||
+      allJulesStatuses.some(s => ['in-progress', 'researching', 'planning', 'coding', 'testing'].includes(s)) ||
       allPRStatuses.some(ps => ps?.color === 'yellow')
     ) {
       return 'yellow';
+    }
+
+    const hasPR = !!issue.pull_request || linkedPRs.length > 0;
+    const hasJules = allJulesStatuses.length > 0;
+
+    if (!hasPR && !hasJules) {
+      return 'grey';
     }
 
     return 'green';
