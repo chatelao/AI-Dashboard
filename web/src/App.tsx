@@ -513,11 +513,17 @@ function App() {
           'Accept': 'application/vnd.github+json',
           'X-GitHub-Api-Version': '2022-11-28'
         },
-        body: JSON.stringify({
-          title: issue.title,
-          body: issue.body,
-          labels: issue.labels.map(l => l.name)
-        })
+        body: (() => {
+          const labels = issue.labels.map(l => l.name);
+          if (issue.isJules && !labels.some(l => l.toLowerCase() === 'jules')) {
+            labels.push('Jules');
+          }
+          return JSON.stringify({
+            title: issue.title,
+            body: issue.body,
+            labels
+          });
+        })()
       });
 
       if (response.ok) {
