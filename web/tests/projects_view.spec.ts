@@ -58,7 +58,7 @@ test('Project View', async ({ page }) => {
   await expect(squares).toHaveCount(2);
 
   // Check colors
-  await expect(squares.first()).toHaveClass(/green/);
+  await expect(squares.first()).toHaveClass(/grey/);
   await expect(squares.nth(1)).toHaveClass(/purple/);
 
   // Take a screenshot
