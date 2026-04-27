@@ -716,9 +716,7 @@ a:hover {
   width: 24px;
   height: 24px;
   border-radius: 4px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
+  display: inline-block;
   transition: transform 0.2s, box-shadow 0.2s;
 }
 
@@ -728,8 +726,8 @@ a:hover {
   z-index: 10;
 }
 
-.status-square.green { }
-.status-square.yellow { }
-.status-square.red { }
-.status-square.purple { }
+.status-square.green { background-color: #238636; }
+.status-square.yellow { background-color: #d29922; }
+.status-square.red { background-color: #f85149; }
+.status-square.purple { background-color: #8957e5; }
 .status-square.grey { background-color: #8b949e; }
