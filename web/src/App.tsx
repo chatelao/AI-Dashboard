@@ -1083,7 +1083,7 @@ function App() {
                             </button>
                           )}
                           <a
-                            href={`https://github.com/${issue.repository.full_name}/issues/new?labels=Jules`}
+                            href={`https://github.com/${issue.repository.full_name}/issues`}
                             target="_blank"
                             rel="noopener noreferrer"
                           >
