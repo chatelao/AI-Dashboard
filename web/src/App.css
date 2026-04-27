@@ -147,6 +147,33 @@ h1 {
   background-color: #30363d;
 }
 
+.view-toggle {
+  display: flex;
+  background-color: #21262d;
+  border: 1px solid #30363d;
+  border-radius: 6px;
+  overflow: hidden;
+  height: 38px;
+}
+
+.btn-toggle {
+  background: none;
+  border: none;
+  color: #c9d1d9;
+  padding: 0 16px;
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn-toggle:hover {
+  background-color: #30363d;
+}
+
+.btn-toggle.active {
+  background-color: #1f6feb;
+  color: white;
+}
 
 .btn-refresh {
   padding: 8px 16px;
@@ -648,3 +675,58 @@ a:hover {
 .tooltip-filename-row {
   white-space: nowrap;
 }
+
+/* Project View Styles */
+.project-view {
+  background-color: #1a1a1a;
+  border-radius: 8px;
+  padding: 1.5rem;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  text-align: left;
+}
+
+.project-line {
+  display: flex;
+  align-items: center;
+  margin-bottom: 1rem;
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid #333;
+}
+
+.project-line:last-child {
+  margin-bottom: 0;
+  padding-bottom: 0;
+  border-bottom: none;
+}
+
+.project-name {
+  width: 200px;
+  font-weight: 600;
+  font-size: 1rem;
+  flex-shrink: 0;
+}
+
+.project-squares {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.status-square {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  display: inline-block;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.status-square:hover {
+  transform: scale(1.15);
+  box-shadow: 0 0 8px rgba(255, 255, 255, 0.2);
+  z-index: 10;
+}
+
+.status-square.green { background-color: #238636; }
+.status-square.yellow { background-color: #d29922; }
+.status-square.red { background-color: #f85149; }
+.status-square.purple { background-color: #8957e5; }
