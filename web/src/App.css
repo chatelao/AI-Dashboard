@@ -759,8 +759,10 @@ a:hover {
 
 .project-line {
   display: flex;
-  flex-direction: column;
-  align-items: flex-start;
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem 1rem;
   margin-bottom: 1rem;
   padding-bottom: 0.5rem;
   border-bottom: 1px solid #333;
@@ -775,7 +777,7 @@ a:hover {
 .project-name {
   font-weight: 600;
   font-size: 1rem;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0;
 }
 
 .project-squares {
