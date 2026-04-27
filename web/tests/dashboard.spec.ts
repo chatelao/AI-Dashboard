@@ -108,10 +108,10 @@ test.describe('Dashboard Consolidation', () => {
     const rows = page.locator('tbody tr');
     await expect(rows).toHaveCount(2);
 
-    // Verify repository tag links to "new issue" page with Jules label
-    const repoTagLink = issueRow.locator('a[href*="/issues/new?labels=Jules"]');
+    // Verify repository tag links to the issues page
+    const repoTagLink = issueRow.locator('a[href$="/issues"]');
     await expect(repoTagLink).toBeVisible();
-    await expect(repoTagLink).toHaveAttribute('href', 'https://github.com/chatelao/AI-Dashboard/issues/new?labels=Jules');
+    await expect(repoTagLink).toHaveAttribute('href', 'https://github.com/chatelao/AI-Dashboard/issues');
   });
 
   test('should display Jules status for issues and linked PRs assigned to Jules', async ({ page }) => {
