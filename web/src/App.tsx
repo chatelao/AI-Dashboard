@@ -176,6 +176,16 @@ function App() {
     return 'green';
   };
 
+  const getStatusEmoji = (color: 'purple' | 'red' | 'yellow' | 'green'): string => {
+    switch (color) {
+      case 'purple': return '🏁';
+      case 'red': return '❌';
+      case 'yellow': return '🚧';
+      case 'green': return '✅';
+      default: return '';
+    }
+  };
+
   const renderColoredFilename = (name: string, additions: number, deletions: number, totalLines: number, status: string) => {
     const L = name.length;
     if (L === 0) return null;
@@ -1127,26 +1137,36 @@ function App() {
                       </a>
                     </div>
                     <div className="project-squares">
-                      {openIssues.map(issue => (
-                        <a
-                          key={issue.id}
-                          href={issue.julesUrl || issue.html_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`status-square ${getIssueStatusColor(issue)}`}
-                          title={`#${issue.number}: ${issue.title}`}
-                        ></a>
-                      ))}
-                      {closedIssues.map(issue => (
-                        <a
-                          key={issue.id}
-                          href={issue.julesUrl || issue.html_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className={`status-square ${getIssueStatusColor(issue)}`}
-                          title={`#${issue.number}: ${issue.title}`}
-                        ></a>
-                      ))}
+                      {openIssues.map(issue => {
+                        const color = getIssueStatusColor(issue);
+                        return (
+                          <a
+                            key={issue.id}
+                            href={issue.julesUrl || issue.html_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`status-square ${color}`}
+                            title={`#${issue.number}: ${issue.title}`}
+                          >
+                            {getStatusEmoji(color)}
+                          </a>
+                        );
+                      })}
+                      {closedIssues.map(issue => {
+                        const color = getIssueStatusColor(issue);
+                        return (
+                          <a
+                            key={issue.id}
+                            href={issue.julesUrl || issue.html_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className={`status-square ${color}`}
+                            title={`#${issue.number}: ${issue.title}`}
+                          >
+                            {getStatusEmoji(color)}
+                          </a>
+                        );
+                      })}
                     </div>
                   </div>
                 );
