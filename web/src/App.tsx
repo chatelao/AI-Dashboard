@@ -71,6 +71,13 @@ function App() {
   const [draftJulesToken, setDraftJulesToken] = useState<string>(julesToken);
   const [draftJulesApiBase, setDraftJulesApiBase] = useState<string>(julesApiBase);
   const [showSettings, setShowSettings] = useState<boolean>(false);
+  const [viewMode, setViewMode] = useState<'list' | 'projects'>(
+    (localStorage.getItem('view_mode') as 'list' | 'projects') || 'list'
+  );
+
+  useEffect(() => {
+    localStorage.setItem('view_mode', viewMode);
+  }, [viewMode]);
 
   const [repoHistory, setRepoHistory] = useState<string[]>(() => {
     const saved = localStorage.getItem('gh_repos');
@@ -142,6 +149,31 @@ function App() {
 
   const formatJulesStatus = (status: string) => {
     return status === 'in-progress' ? 'InProgress' : status.replace(/-/g, ' ');
+  };
+
+  const getIssueStatusColor = (issue: IssueWithJulesStatus): 'purple' | 'red' | 'yellow' | 'green' => {
+    if (issue.state === 'closed') return 'purple';
+
+    const julesStatus = issue.julesStatus;
+    const prStatus = issue.prStatus;
+
+    // Check linked PRs as well
+    const linkedPRs = issue.linkedPRs || [];
+    const allJulesStatuses = [julesStatus, ...linkedPRs.map(pr => pr.julesStatus)].filter(Boolean);
+    const allPRStatuses = [prStatus, ...linkedPRs.map(pr => pr.prStatus)].filter(Boolean);
+
+    if (allJulesStatuses.includes('failed') || allPRStatuses.some(ps => ps?.color === 'red')) {
+      return 'red';
+    }
+
+    if (
+      allJulesStatuses.some(s => ['in-progress', 'researching', 'planning', 'coding', 'testing'].includes(s!)) ||
+      allPRStatuses.some(ps => ps?.color === 'yellow')
+    ) {
+      return 'yellow';
+    }
+
+    return 'green';
   };
 
   const renderColoredFilename = (name: string, additions: number, deletions: number, totalLines: number, status: string) => {
@@ -978,6 +1010,20 @@ function App() {
             />
           </div>
           <div className="header-actions">
+            <div className="view-toggle">
+              <button
+                className={`btn-toggle ${viewMode === 'list' ? 'active' : ''}`}
+                onClick={() => setViewMode('list')}
+              >
+                List
+              </button>
+              <button
+                className={`btn-toggle ${viewMode === 'projects' ? 'active' : ''}`}
+                onClick={() => setViewMode('projects')}
+              >
+                Projects
+              </button>
+            </div>
             <button className="btn-refresh" onClick={() => setRefreshTrigger(prev => prev + 1)}>
               Refresh
             </button>
@@ -1050,7 +1096,66 @@ function App() {
         {loading && <p className="status-message">Loading issues...</p>}
         {error && <p className="status-message error">Error: {error}</p>}
 
-        {!loading && !error && (
+        {!loading && !error && viewMode === 'projects' && (
+          <div className="project-view">
+            {(() => {
+              const reposMap = new Map<string, IssueWithJulesStatus[]>();
+              issues.forEach(issue => {
+                const repoName = issue.repository.full_name;
+                if (!reposMap.has(repoName)) {
+                  reposMap.set(repoName, []);
+                }
+                reposMap.get(repoName)!.push(issue);
+              });
+
+              return Array.from(reposMap.entries()).map(([repoName, repoIssues]) => {
+                const openIssues = repoIssues.filter(i => i.state === 'open');
+                const closedIssues = repoIssues
+                  .filter(i => i.state === 'closed')
+                  .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
+                  .slice(0, 3);
+
+                return (
+                  <div key={repoName} className="project-line">
+                    <div className="project-name">
+                      <a
+                        href={`https://github.com/${repoName}/issues`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        {repoName.split('/')[1]}
+                      </a>
+                    </div>
+                    <div className="project-squares">
+                      {openIssues.map(issue => (
+                        <a
+                          key={issue.id}
+                          href={issue.julesUrl || issue.html_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`status-square ${getIssueStatusColor(issue)}`}
+                          title={`#${issue.number}: ${issue.title}`}
+                        ></a>
+                      ))}
+                      {closedIssues.map(issue => (
+                        <a
+                          key={issue.id}
+                          href={issue.julesUrl || issue.html_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={`status-square ${getIssueStatusColor(issue)}`}
+                          title={`#${issue.number}: ${issue.title}`}
+                        ></a>
+                      ))}
+                    </div>
+                  </div>
+                );
+              });
+            })()}
+          </div>
+        )}
+
+        {!loading && !error && viewMode === 'list' && (
           <div className="table-container">
             <table>
               <thead>
