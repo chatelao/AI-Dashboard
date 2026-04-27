@@ -528,6 +528,20 @@ a:hover {
   .btn-action {
     margin-top: 4px;
   }
+
+  .project-view {
+    padding: 1rem;
+  }
+
+  .project-line {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .project-name {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
 }
 
 .btn-duplicate {
