@@ -1119,19 +1119,6 @@ function App() {
                         )}
                         {issue.prStatus && (
                           <div className="pr-status-container">
-                            <svg
-                              className={`pr-icon pr-icon-${issue.prStatus.color}`}
-                              viewBox="0 0 16 16"
-                              version="1.1"
-                              width="16"
-                              height="16"
-                              aria-hidden="true"
-                            >
-                              <path
-                                fillRule="evenodd"
-                                d="M7.177 3.03a.75.75 0 11-1.354-.645 2.75 2.75 0 015.162 1.377 2.25 2.25 0 01-.89 4.113 2.25 2.25 0 011.655 2.175v.25a2.25 2.25 0 11-4.5 0v-.25c0-.97.615-1.798 1.48-2.122a2.75 2.75 0 00-1.553-4.898zM9 10.25a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z"
-                              ></path>
-                            </svg>
                             <span className={`pr-label pr-label-${issue.prStatus.color}`}>
                               {issue.prStatus.label}
                             </span>
@@ -1162,19 +1149,6 @@ function App() {
                             </div>
                           ) : pr.prStatus && (
                             <div key={pr.id} className="pr-status-container subtitle">
-                              <svg
-                                className={`pr-icon pr-icon-${pr.prStatus.color}`}
-                                viewBox="0 0 16 16"
-                                version="1.1"
-                                width="16"
-                                height="16"
-                                aria-hidden="true"
-                              >
-                                <path
-                                  fillRule="evenodd"
-                                  d="M7.177 3.03a.75.75 0 11-1.354-.645 2.75 2.75 0 015.162 1.377 2.25 2.25 0 01-.89 4.113 2.25 2.25 0 011.655 2.175v.25a2.25 2.25 0 11-4.5 0v-.25c0-.97.615-1.798 1.48-2.122a2.75 2.75 0 00-1.553-4.898zM9 10.25a.75.75 0 00-1.5 0v.25a.75.75 0 001.5 0v-.25z"
-                                ></path>
-                              </svg>
                               <span className={`pr-label pr-label-${pr.prStatus.color}`}>
                                 {pr.prStatus.label}
                               </span>

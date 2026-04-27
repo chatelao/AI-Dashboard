@@ -543,23 +543,23 @@ a:hover {
 }
 
 .btn-update {
-  background-color: #21262d;
-  color: #c9d1d9;
-}
-
-.btn-update:hover:not(:disabled) {
-  background-color: #30363d;
-  border-color: #8b949e;
-}
-
-.btn-merge {
   background-color: #238636;
   color: #ffffff;
   border-color: rgba(240, 246, 252, 0.1);
 }
 
-.btn-merge:hover:not(:disabled) {
+.btn-update:hover:not(:disabled) {
   background-color: #2ea043;
+}
+
+.btn-merge {
+  background-color: #21262d;
+  color: #c9d1d9;
+}
+
+.btn-merge:hover:not(:disabled) {
+  background-color: #30363d;
+  border-color: #8b949e;
 }
 
 /* Tooltip container */
