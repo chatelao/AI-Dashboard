@@ -528,6 +528,40 @@ a:hover {
   .btn-action {
     margin-top: 4px;
   }
+
+  .project-view {
+    padding: 1rem;
+  }
+
+  .project-line {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .project-name {
+    width: 100%;
+    margin-bottom: 0.5rem;
+  }
+
+  .tooltip .tooltip-text {
+    left: 50%;
+    transform: translateX(-50%);
+  }
+
+  .tooltip .tooltip-text::after {
+    left: 50%;
+  }
+
+  .issue-title-line .tooltip .tooltip-text,
+  .subtitle .tooltip .tooltip-text {
+    left: -20px;
+    transform: none;
+  }
+
+  .issue-title-line .tooltip .tooltip-text::after,
+  .subtitle .tooltip .tooltip-text::after {
+    left: 30px;
+  }
 }
 
 .btn-duplicate {
@@ -622,13 +656,18 @@ a:hover {
 
 @media (max-width: 600px) {
   .tooltip .tooltip-text {
-    max-width: 300px;
+    max-width: 80vw;
   }
 }
 
 @media (max-width: 400px) {
   .tooltip .tooltip-text {
-    max-width: 200px;
+    max-width: 85vw;
+  }
+
+  .issue-title-line .tooltip .tooltip-text,
+  .subtitle .tooltip .tooltip-text {
+    max-width: 65vw;
   }
 }
 
