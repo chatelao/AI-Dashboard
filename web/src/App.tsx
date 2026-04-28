@@ -191,7 +191,7 @@ function App() {
 
   const getIssueStatusUrl = (issue: IssueWithJulesStatus) => {
     const color = getIssueStatusColor(issue);
-    if (color === 'green') {
+    if (color === 'green' || color === 'purple') {
       return issue.pull_request?.html_url || issue.linkedPRs?.[0]?.html_url || issue.julesUrl || issue.html_url;
     }
     return issue.julesUrl || issue.html_url;
