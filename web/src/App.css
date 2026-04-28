@@ -295,12 +295,11 @@ a:hover {
   color: white;
 }
 
-.jules-status-researching, .jules-status-planning { background-color: #0366d6; color: white; }
+.jules-status-researching, .jules-status-planning, .jules-status-awaiting-plan-approval, .jules-status-awaiting-user-feedback { background-color: #0366d6; color: white; }
 .jules-status-coding, .jules-status-in-progress { background-color: #f1e05a; color: black; }
 .jules-status-testing { background-color: #f66a0a; color: white; }
 .jules-status-completed { background-color: #28a745; color: white; }
 .jules-status-queued { background-color: #6a737d; color: white; }
-.jules-status-awaiting-plan-approval, .jules-status-awaiting-user-feedback { background-color: #d29922; color: white; }
 .jules-status-paused { background-color: #8b949e; color: white; }
 .jules-status-failed { background-color: #f85149; color: white; }
 
@@ -804,6 +803,7 @@ a:hover {
 
 .status-square.green { background-color: #238636; }
 .status-square.yellow { background-color: #d29922; }
+.status-square.blue { background-color: #0366d6; }
 .status-square.red { background-color: #f85149; }
 .status-square.purple { background-color: #8957e5; }
 .status-square.grey { background-color: #8b949e; }

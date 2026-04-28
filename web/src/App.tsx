@@ -152,7 +152,7 @@ function App() {
     return status === 'in-progress' ? 'InProgress' : status.replace(/-/g, ' ');
   };
 
-  const getIssueStatusColor = (issue: IssueWithJulesStatus): 'purple' | 'red' | 'yellow' | 'green' | 'grey' => {
+  const getIssueStatusColor = (issue: IssueWithJulesStatus): 'purple' | 'red' | 'yellow' | 'blue' | 'green' | 'grey' => {
     if (issue.state === 'closed') return 'purple';
 
     const julesStatus = issue.julesStatus;
@@ -168,20 +168,25 @@ function App() {
     }
 
     if (
-      allJulesStatuses.some(s => ['in-progress', 'researching', 'planning', 'coding', 'testing'].includes(s)) ||
+      allJulesStatuses.some(s => ['in-progress', 'coding', 'testing'].includes(s)) ||
       allPRStatuses.some(ps => ps?.color === 'yellow')
     ) {
       return 'yellow';
     }
 
-    const hasPR = !!issue.pull_request || linkedPRs.length > 0;
-    const hasJules = allJulesStatuses.length > 0;
-
-    if (!hasPR && !hasJules) {
-      return 'grey';
+    if (
+      allJulesStatuses.some(s => ['researching', 'planning', 'awaiting-plan-approval', 'awaiting-user-feedback'].includes(s))
+    ) {
+      return 'blue';
     }
 
-    return 'green';
+    const hasFinishedPR = allPRStatuses.some(ps => ps?.color === 'green' || ps?.color === 'black');
+
+    if (hasFinishedPR) {
+      return 'green';
+    }
+
+    return 'grey';
   };
 
   const getIssueStatusUrl = (issue: IssueWithJulesStatus) => {
