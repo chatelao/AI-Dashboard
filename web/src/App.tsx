@@ -184,6 +184,14 @@ function App() {
     return 'green';
   };
 
+  const getIssueStatusUrl = (issue: IssueWithJulesStatus) => {
+    const color = getIssueStatusColor(issue);
+    if (color === 'green') {
+      return issue.pull_request?.html_url || issue.linkedPRs?.[0]?.html_url || issue.julesUrl || issue.html_url;
+    }
+    return issue.julesUrl || issue.html_url;
+  };
+
   const renderColoredFilename = (name: string, additions: number, deletions: number, totalLines: number, status: string) => {
     const L = name.length;
     if (L === 0) return null;
@@ -1140,7 +1148,7 @@ function App() {
                       {[...openIssues, ...closedIssues].map(issue => (
                         <span key={issue.id} className="tooltip">
                           <a
-                            href={issue.julesUrl || issue.html_url}
+                            href={getIssueStatusUrl(issue)}
                             target="_blank"
                             rel="noopener noreferrer"
                             className={`status-square ${getIssueStatusColor(issue)}`}
