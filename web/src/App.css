@@ -811,9 +811,26 @@ a:hover {
 .project-roadmap {
   display: flex;
   flex-wrap: wrap;
-  gap: 4px;
+  gap: 8px 12px;
   margin-top: 4px;
   width: 100%;
+  align-items: center;
+}
+
+.roadmap-item {
+  display: inline-flex;
+  align-items: center;
+}
+
+.roadmap-subtasks {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+  border: 1px solid #30363d;
+  border-radius: 10px;
+  padding: 2px 6px;
+  background: rgba(48, 54, 61, 0.2);
+  margin: 0 2px;
 }
 
 .roadmap-circle {

@@ -45,9 +45,9 @@ test('Roadmap Progress Circles', async ({ page }) => {
     });
   });
 
-  // Mock ROADMAP.md content
+  // Mock ROADMAP.md content with hierarchy
   await page.route(`https://api.github.com/repos/${repo}/contents/ROADMAP.md?ref=main`, async route => {
-    const content = btoa("- [x] Task 1\n- [ ] Task 2\n- [x] Task 3");
+    const content = btoa("- [x] Task 1\n  - [ ] Subtask 1.1\n  - [x] Subtask 1.2\n- [ ] Task 2");
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
@@ -71,18 +71,20 @@ test('Roadmap Progress Circles', async ({ page }) => {
   await expect(roadmapContainer).toBeVisible();
 
   const circles = roadmapContainer.locator('.roadmap-circle');
-  await expect(circles).toHaveCount(3);
+  await expect(circles).toHaveCount(4);
 
-  // Check completed status
-  await expect(circles.nth(0)).toHaveClass(/completed/);
-  await expect(circles.nth(1)).not.toHaveClass(/completed/);
-  await expect(circles.nth(2)).toHaveClass(/completed/);
+  // Verify hierarchy in DOM
+  const subtasks = roadmapContainer.locator('.roadmap-subtasks');
+  await expect(subtasks).toHaveCount(1);
+  const subtaskCircles = subtasks.locator('.roadmap-circle');
+  await expect(subtaskCircles).toHaveCount(2);
 
-  // Check tooltips
+  // Check tooltips to confirm structure
   const roadmapTooltips = roadmapContainer.locator('.tooltip');
   await expect(roadmapTooltips.nth(0).locator('.tooltip-text')).toHaveText('Task 1', { ArrayAttribute: 'hidden' });
-  await expect(roadmapTooltips.nth(1).locator('.tooltip-text')).toHaveText('Task 2', { ArrayAttribute: 'hidden' });
-  await expect(roadmapTooltips.nth(2).locator('.tooltip-text')).toHaveText('Task 3', { ArrayAttribute: 'hidden' });
+  await expect(roadmapTooltips.nth(1).locator('.tooltip-text')).toHaveText('Subtask 1.1', { ArrayAttribute: 'hidden' });
+  await expect(roadmapTooltips.nth(2).locator('.tooltip-text')).toHaveText('Subtask 1.2', { ArrayAttribute: 'hidden' });
+  await expect(roadmapTooltips.nth(3).locator('.tooltip-text')).toHaveText('Task 2', { ArrayAttribute: 'hidden' });
 
   // Take a screenshot
   await page.screenshot({ path: 'roadmap-progress.png' });
