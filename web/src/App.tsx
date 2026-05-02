@@ -29,6 +29,11 @@ interface PRStatus {
   label: string;
 }
 
+interface RoadmapTask {
+  completed: boolean;
+  title: string;
+}
+
 interface IssueWithJulesStatus extends GitHubIssue {
   julesStatus?: string;
   julesUrl?: string;
@@ -63,6 +68,7 @@ const DEFAULT_JULES_API_BASE = 'https://jules.googleapis.com/v1alpha';
 
 function App() {
   const [issues, setIssues] = useState<IssueWithJulesStatus[]>([]);
+  const [repoRoadmaps, setRepoRoadmaps] = useState<Record<string, RoadmapTask[]>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [ghToken, setGhToken] = useState<string>(localStorage.getItem('github_token') || '');
@@ -91,6 +97,7 @@ function App() {
 
   const allConsolidatedIssuesRef = useRef<IssueWithJulesStatus[]>([]);
   const currentEnrichedIssuesRef = useRef<IssueWithJulesStatus[]>([]);
+  const fetchingRoadmapsRef = useRef<Set<string>>(new Set());
   const lastFetchKeyRef = useRef<string>('');
   const lastAutoRefreshRef = useRef<number>(0);
   const searchInputRef = useRef<HTMLInputElement>(null);
@@ -350,6 +357,62 @@ function App() {
         )}
       </span>
     );
+  };
+
+  const fetchRoadmaps = async (repo: string, headers: HeadersInit) => {
+    if (fetchingRoadmapsRef.current.has(repo)) return;
+    fetchingRoadmapsRef.current.add(repo);
+
+    try {
+      const repoResponse = await fetch(`https://api.github.com/repos/${repo}`, { headers });
+      if (!repoResponse.ok) return;
+      const repoData = await repoResponse.json();
+      const defaultBranch = repoData.default_branch || 'main';
+
+      const treeResponse = await fetch(`https://api.github.com/repos/${repo}/git/trees/${defaultBranch}?recursive=1`, { headers });
+      if (!treeResponse.ok) return;
+      const treeData = await treeResponse.json();
+
+      const roadmapFiles = (treeData.tree as any[]).filter(file =>
+        file.path.toLowerCase().endsWith('roadmap.md') && file.type === 'blob'
+      );
+
+      const allTasks: RoadmapTask[] = [];
+
+      await Promise.all(roadmapFiles.map(async (file) => {
+        try {
+          const contentResponse = await fetch(`https://api.github.com/repos/${repo}/contents/${file.path}?ref=${defaultBranch}`, { headers });
+          if (!contentResponse.ok) return;
+          const contentData = await contentResponse.json();
+          // Decode base64 handling UTF-8 characters correctly
+          const binaryString = atob(contentData.content.replace(/\n/g, ''));
+          const bytes = new Uint8Array(binaryString.length);
+          for (let i = 0; i < binaryString.length; i++) {
+            bytes[i] = binaryString.charCodeAt(i);
+          }
+          const content = new TextDecoder().decode(bytes);
+
+          const lines = content.split('\n');
+          lines.forEach(line => {
+            const match = line.match(/^\s*-\s*\[([ xX])\]\s*(.*)$/);
+            if (match) {
+              allTasks.push({
+                completed: match[1].toLowerCase() === 'x',
+                title: match[2].trim()
+              });
+            }
+          });
+        } catch (err) {
+          console.error(`Error fetching/parsing roadmap file ${file.path} for ${repo}:`, err);
+        }
+      }));
+
+      if (allTasks.length > 0) {
+        setRepoRoadmaps(prev => ({ ...prev, [repo]: allTasks }));
+      }
+    } catch (err) {
+      console.error(`Error fetching roadmaps for ${repo}:`, err);
+    }
   };
 
   const fetchRawIssues = async (repo: string, filterState: string, headers: HeadersInit): Promise<GitHubIssue[]> => {
@@ -643,7 +706,10 @@ function App() {
           }
 
           const allReposResults = await Promise.all(
-            effectiveRepoList.map(repo => fetchRawIssues(repo, filterState, headers))
+            effectiveRepoList.map(repo => {
+              fetchRoadmaps(repo, headers);
+              return fetchRawIssues(repo, filterState, headers);
+            })
           );
 
           const filteredReposResults = allReposResults.map(repoIssues => {
@@ -1138,6 +1204,8 @@ function App() {
                   .sort((a, b) => new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime())
                   .slice(0, 3);
 
+                const roadmapTasks = repoRoadmaps[repoName] || [];
+
                 return (
                   <div key={repoName} className="project-line">
                     <div className="project-name">
@@ -1148,6 +1216,16 @@ function App() {
                       >
                         {repoName.split('/')[1]}
                       </a>
+                      {roadmapTasks.length > 0 && (
+                        <div className="project-roadmap">
+                          {roadmapTasks.map((task, idx) => (
+                            <span key={idx} className="tooltip">
+                              <span className={`roadmap-circle ${task.completed ? 'completed' : ''}`}></span>
+                              <span className="tooltip-text">{task.title}</span>
+                            </span>
+                          ))}
+                        </div>
+                      )}
                     </div>
                     <div className="project-squares">
                       {[...openIssues, ...closedIssues].map(issue => (

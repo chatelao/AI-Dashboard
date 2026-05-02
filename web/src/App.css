@@ -807,3 +807,22 @@ a:hover {
 .status-square.red { background-color: #f85149; }
 .status-square.purple { background-color: #8957e5; }
 .status-square.grey { background-color: #8b949e; }
+
+.project-roadmap {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+
+.roadmap-circle {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: #484f58;
+  display: block;
+}
+
+.roadmap-circle.completed {
+  background-color: #238636;
+}
