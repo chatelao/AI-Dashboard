@@ -1216,16 +1216,6 @@ function App() {
                       >
                         {repoName.split('/')[1]}
                       </a>
-                      {roadmapTasks.length > 0 && (
-                        <div className="project-roadmap">
-                          {roadmapTasks.map((task, idx) => (
-                            <span key={idx} className="tooltip">
-                              <span className={`roadmap-circle ${task.completed ? 'completed' : ''}`}></span>
-                              <span className="tooltip-text">{task.title}</span>
-                            </span>
-                          ))}
-                        </div>
-                      )}
                     </div>
                     <div className="project-squares">
                       {[...openIssues, ...closedIssues].map(issue => (
@@ -1259,6 +1249,16 @@ function App() {
                         </span>
                       ))}
                     </div>
+                    {roadmapTasks.length > 0 && (
+                      <div className="project-roadmap">
+                        {roadmapTasks.map((task, idx) => (
+                          <span key={idx} className="tooltip">
+                            <span className={`roadmap-circle ${task.completed ? 'completed' : ''}`}></span>
+                            <span className="tooltip-text">{task.title}</span>
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 );
               });
