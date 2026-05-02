@@ -35,6 +35,11 @@ interface RoadmapTask {
   children?: RoadmapTask[];
 }
 
+interface RoadmapFile {
+  filename: string;
+  tasks: RoadmapTask[];
+}
+
 interface IssueWithJulesStatus extends GitHubIssue {
   julesStatus?: string;
   julesUrl?: string;
@@ -69,7 +74,7 @@ const DEFAULT_JULES_API_BASE = 'https://jules.googleapis.com/v1alpha';
 
 function App() {
   const [issues, setIssues] = useState<IssueWithJulesStatus[]>([]);
-  const [repoRoadmaps, setRepoRoadmaps] = useState<Record<string, RoadmapTask[]>>({});
+  const [repoRoadmaps, setRepoRoadmaps] = useState<Record<string, RoadmapFile[]>>({});
   const [loading, setLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [ghToken, setGhToken] = useState<string>(localStorage.getItem('github_token') || '');
@@ -346,16 +351,17 @@ function App() {
     );
   };
 
-  const renderRoadmapTasks = (tasks: RoadmapTask[]) => {
+  const renderRoadmapTasks = (tasks: RoadmapTask[], level: number = 0) => {
+    const label = level === 0 ? 'Task' : 'Subtask';
     return tasks.map((task, idx) => (
-      <div key={idx} className="roadmap-item">
+      <div key={idx} className="roadmap-item" title={label}>
         <span className="tooltip">
           <span className={`roadmap-circle ${task.completed ? 'completed' : ''}`}></span>
-          <span className="tooltip-text">{task.title}</span>
+          <span className="tooltip-text">{label}: {task.title}</span>
         </span>
         {task.children && task.children.length > 0 && (
-          <div className="roadmap-subtasks">
-            {renderRoadmapTasks(task.children)}
+          <div className="roadmap-subtasks" title="Subtasks">
+            {renderRoadmapTasks(task.children, level + 1)}
           </div>
         )}
       </div>
@@ -394,12 +400,10 @@ function App() {
         file.path.toLowerCase().endsWith('roadmap.md') && file.type === 'blob'
       );
 
-      const allTasks: RoadmapTask[] = [];
-
-      await Promise.all(roadmapFiles.map(async (file) => {
+      const roadmapFilesData = await Promise.all(roadmapFiles.map(async (file): Promise<RoadmapFile | null> => {
         try {
           const contentResponse = await fetch(`https://api.github.com/repos/${repo}/contents/${file.path}?ref=${defaultBranch}`, { headers });
-          if (!contentResponse.ok) return;
+          if (!contentResponse.ok) return null;
           const contentData = await contentResponse.json();
           // Decode base64 handling UTF-8 characters correctly
           const binaryString = atob(contentData.content.replace(/\n/g, ''));
@@ -431,16 +435,20 @@ function App() {
               stack.push({ indent, tasks: newTask.children! });
             }
           });
-          // Only push tasks that actually have something (remove empty children arrays before pushing if desired,
-          // but keeping them is fine for the recursive renderer)
-          allTasks.push(...fileRootTasks);
+          return {
+            filename: file.path,
+            tasks: fileRootTasks
+          };
         } catch (err) {
           console.error(`Error fetching/parsing roadmap file ${file.path} for ${repo}:`, err);
+          return null;
         }
       }));
 
-      if (allTasks.length > 0) {
-        setRepoRoadmaps(prev => ({ ...prev, [repo]: allTasks }));
+      const allRoadmapFiles = roadmapFilesData.filter((f): f is RoadmapFile => f !== null && f.tasks.length > 0);
+
+      if (allRoadmapFiles.length > 0) {
+        setRepoRoadmaps(prev => ({ ...prev, [repo]: allRoadmapFiles }));
       }
     } catch (err) {
       console.error(`Error fetching roadmaps for ${repo}:`, err);
@@ -1249,7 +1257,7 @@ function App() {
                         {repoName.split('/')[1]}
                       </a>
                     </div>
-                    <div className="project-squares">
+                    <div className="project-squares" title="Issues and Pull Requests">
                       {[...openIssues, ...closedIssues].map(issue => (
                         <span key={issue.id} className="tooltip">
                           <a
@@ -1282,8 +1290,12 @@ function App() {
                       ))}
                     </div>
                     {roadmapTasks.length > 0 && (
-                      <div className="project-roadmap">
-                        {renderRoadmapTasks(roadmapTasks)}
+                      <div className="project-roadmap" title="Project Roadmap">
+                        {roadmapTasks.map((rf, rfIdx) => (
+                          <div key={rfIdx} className="roadmap-file-group" title={`Roadmap: ${rf.filename}`}>
+                            {renderRoadmapTasks(rf.tasks)}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
