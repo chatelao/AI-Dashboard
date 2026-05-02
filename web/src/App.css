@@ -817,6 +817,13 @@ a:hover {
   align-items: center;
 }
 
+.roadmap-file-group {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: center;
+}
+
 .roadmap-item {
   display: inline-flex;
   align-items: center;

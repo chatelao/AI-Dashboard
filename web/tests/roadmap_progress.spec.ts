@@ -81,10 +81,10 @@ test('Roadmap Progress Circles', async ({ page }) => {
 
   // Check tooltips to confirm structure
   const roadmapTooltips = roadmapContainer.locator('.tooltip');
-  await expect(roadmapTooltips.nth(0).locator('.tooltip-text')).toHaveText('Task 1', { ArrayAttribute: 'hidden' });
-  await expect(roadmapTooltips.nth(1).locator('.tooltip-text')).toHaveText('Subtask 1.1', { ArrayAttribute: 'hidden' });
-  await expect(roadmapTooltips.nth(2).locator('.tooltip-text')).toHaveText('Subtask 1.2', { ArrayAttribute: 'hidden' });
-  await expect(roadmapTooltips.nth(3).locator('.tooltip-text')).toHaveText('Task 2', { ArrayAttribute: 'hidden' });
+  await expect(roadmapTooltips.nth(0).locator('.tooltip-text')).toHaveText('Task: Task 1', { ArrayAttribute: 'hidden' });
+  await expect(roadmapTooltips.nth(1).locator('.tooltip-text')).toHaveText('Subtask: Subtask 1.1', { ArrayAttribute: 'hidden' });
+  await expect(roadmapTooltips.nth(2).locator('.tooltip-text')).toHaveText('Subtask: Subtask 1.2', { ArrayAttribute: 'hidden' });
+  await expect(roadmapTooltips.nth(3).locator('.tooltip-text')).toHaveText('Task: Task 2', { ArrayAttribute: 'hidden' });
 
   // Take a screenshot
   await page.screenshot({ path: 'roadmap-progress.png' });
