@@ -813,6 +813,7 @@ a:hover {
   flex-wrap: wrap;
   gap: 4px;
   margin-top: 4px;
+  width: 100%;
 }
 
 .roadmap-circle {
