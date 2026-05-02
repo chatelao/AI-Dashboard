@@ -32,6 +32,7 @@ interface PRStatus {
 interface RoadmapTask {
   completed: boolean;
   title: string;
+  children?: RoadmapTask[];
 }
 
 interface IssueWithJulesStatus extends GitHubIssue {
@@ -345,6 +346,22 @@ function App() {
     );
   };
 
+  const renderRoadmapTasks = (tasks: RoadmapTask[]) => {
+    return tasks.map((task, idx) => (
+      <div key={idx} className="roadmap-item">
+        <span className="tooltip">
+          <span className={`roadmap-circle ${task.completed ? 'completed' : ''}`}></span>
+          <span className="tooltip-text">{task.title}</span>
+        </span>
+        {task.children && task.children.length > 0 && (
+          <div className="roadmap-subtasks">
+            {renderRoadmapTasks(task.children)}
+          </div>
+        )}
+      </div>
+    ));
+  };
+
   const renderPRNumberTooltip = (item: IssueWithJulesStatus, includeLabel: boolean = true) => {
     return (
       <span className="tooltip">
@@ -393,15 +410,30 @@ function App() {
           const content = new TextDecoder().decode(bytes);
 
           const lines = content.split('\n');
+          const fileRootTasks: RoadmapTask[] = [];
+          const stack: { indent: number, tasks: RoadmapTask[] }[] = [
+            { indent: -1, tasks: fileRootTasks }
+          ];
+
           lines.forEach(line => {
-            const match = line.match(/^\s*-\s*\[([ xX])\]\s*(.*)$/);
+            const match = line.match(/^(\s*)-\s*\[([ xX])\]\s*(.*)$/);
             if (match) {
-              allTasks.push({
-                completed: match[1].toLowerCase() === 'x',
-                title: match[2].trim()
-              });
+              const indent = match[1].length;
+              const completed = match[2].toLowerCase() === 'x';
+              const title = match[3].trim();
+              const newTask: RoadmapTask = { completed, title, children: [] };
+
+              while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
+                stack.pop();
+              }
+
+              stack[stack.length - 1].tasks.push(newTask);
+              stack.push({ indent, tasks: newTask.children! });
             }
           });
+          // Only push tasks that actually have something (remove empty children arrays before pushing if desired,
+          // but keeping them is fine for the recursive renderer)
+          allTasks.push(...fileRootTasks);
         } catch (err) {
           console.error(`Error fetching/parsing roadmap file ${file.path} for ${repo}:`, err);
         }
@@ -1251,12 +1283,7 @@ function App() {
                     </div>
                     {roadmapTasks.length > 0 && (
                       <div className="project-roadmap">
-                        {roadmapTasks.map((task, idx) => (
-                          <span key={idx} className="tooltip">
-                            <span className={`roadmap-circle ${task.completed ? 'completed' : ''}`}></span>
-                            <span className="tooltip-text">{task.title}</span>
-                          </span>
-                        ))}
+                        {renderRoadmapTasks(roadmapTasks)}
                       </div>
                     )}
                   </div>
