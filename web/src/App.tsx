@@ -165,6 +165,10 @@ function App() {
     return status === 'in-progress' ? 'InProgress' : status.replace(/-/g, ' ');
   };
 
+  const hasAutoRepeatLabel = (issue: IssueWithJulesStatus) => {
+    return issue.labels.some(l => l.name.toLowerCase() === 'auto-repeat');
+  };
+
   const getIssueStatusColor = (issue: IssueWithJulesStatus): 'purple' | 'red' | 'yellow' | 'blue' | 'green' | 'grey' => {
     if (issue.state === 'closed') return 'purple';
 
@@ -1264,7 +1268,7 @@ function App() {
                             href={getIssueStatusUrl(issue)}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className={`status-square ${getIssueStatusColor(issue)}`}
+                            className={`status-square ${getIssueStatusColor(issue)}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}
                           ></a>
                           <span className="tooltip-text">
                             <strong>#{issue.number}: {issue.title}</strong>
@@ -1361,7 +1365,7 @@ function App() {
                       </div>
                     </td>
                     <td data-label="State">
-                      <span className={`badge state-${issue.state}`}>
+                      <span className={`badge state-${issue.state}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
                         {issue.state}
                       </span>
                     </td>
@@ -1374,7 +1378,7 @@ function App() {
                         )}
                         {issue.prStatus && (
                           <div className="pr-status-container">
-                            <span className={`pr-label pr-label-${issue.prStatus.color}`}>
+                            <span className={`pr-label pr-label-${issue.prStatus.color}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
                               {issue.prStatus.label}
                             </span>
                             {ghToken && issue.mergeable_state === 'behind' && (
@@ -1404,7 +1408,7 @@ function App() {
                             </div>
                           ) : pr.prStatus && (
                             <div key={pr.id} className="pr-status-container subtitle">
-                              <span className={`pr-label pr-label-${pr.prStatus.color}`}>
+                              <span className={`pr-label pr-label-${pr.prStatus.color}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
                                 {pr.prStatus.label}
                               </span>
                               {ghToken && pr.mergeable_state === 'behind' && (
@@ -1441,12 +1445,12 @@ function App() {
                         {issue.julesStatus ? (
                           issue.julesUrl ? (
                             <a href={issue.julesUrl} target="_blank" rel="noopener noreferrer">
-                              <span className={`badge jules-status-${issue.julesStatus}`}>
+                              <span className={`badge jules-status-${issue.julesStatus}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
                                 {formatJulesStatus(issue.julesStatus)}
                               </span>
                             </a>
                           ) : (
-                            <span className={`badge jules-status-${issue.julesStatus}`}>
+                            <span className={`badge jules-status-${issue.julesStatus}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
                               {formatJulesStatus(issue.julesStatus)}
                             </span>
                           )
@@ -1468,12 +1472,12 @@ function App() {
                             <div key={pr.id} className="subtitle">
                               {pr.julesUrl ? (
                                 <a href={pr.julesUrl} target="_blank" rel="noopener noreferrer">
-                                  <span className={`badge jules-status-${pr.julesStatus}`}>
+                                  <span className={`badge jules-status-${pr.julesStatus}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
                                     {formatJulesStatus(pr.julesStatus)}
                                   </span>
                                 </a>
                               ) : (
-                                <span className={`badge jules-status-${pr.julesStatus}`}>
+                                <span className={`badge jules-status-${pr.julesStatus}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
                                   {formatJulesStatus(pr.julesStatus)}
                                 </span>
                               )}

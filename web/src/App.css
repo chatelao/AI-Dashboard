@@ -285,6 +285,10 @@ a:hover {
   text-transform: capitalize;
 }
 
+.auto-repeat-tag {
+  border: 2px solid #e82dce !important;
+}
+
 .state-open {
   background-color: #238636;
   color: white;
@@ -325,6 +329,11 @@ a:hover {
 .pr-label {
   font-size: 0.9rem;
   font-weight: 500;
+}
+
+.pr-label.auto-repeat-tag {
+  padding: 2px 6px;
+  border-radius: 4px;
 }
 
 .pr-label-black { color: #8b949e; }
@@ -793,6 +802,10 @@ a:hover {
   align-items: center;
   justify-content: center;
   transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.status-square.auto-repeat-tag {
+  box-sizing: border-box;
 }
 
 .status-square:hover {
