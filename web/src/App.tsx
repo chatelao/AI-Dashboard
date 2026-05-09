@@ -27,6 +27,7 @@ interface GitHubIssue {
 interface PRStatus {
   color: 'black' | 'green' | 'red' | 'yellow';
   label: string;
+  reason?: string;
 }
 
 interface RoadmapTask {
@@ -44,6 +45,7 @@ interface IssueWithJulesStatus extends GitHubIssue {
   julesStatus?: string;
   julesUrl?: string;
   julesTitle?: string;
+  julesFailureReason?: string;
   prStatus?: PRStatus;
   linkedPRs?: IssueWithJulesStatus[];
   isJules?: boolean;
@@ -530,7 +532,7 @@ function App() {
     return undefined;
   };
 
-  const fetchJulesStatus = async (sessionId: string, token: string): Promise<{ status: string; url?: string; title?: string } | undefined> => {
+  const fetchJulesStatus = async (sessionId: string, token: string): Promise<{ status: string; url?: string; title?: string; reason?: string } | undefined> => {
     let url;
     // Use the exact session endpoint as requested
     if (julesApiBase.includes('?url=')) {
@@ -568,7 +570,8 @@ function App() {
         return {
           status: data.state.replace('STATE_', '').replace(/_/g, '-').toLowerCase(),
           url: data.url,
-          title: data.title
+          title: data.title,
+          reason: data.failureReason || data.failureMessage || data.reason || data.error?.message || data.message
         };
       }
       return undefined;
@@ -877,6 +880,7 @@ function App() {
             if (existing.julesStatus) {
               enrichedItem.julesStatus = existing.julesStatus;
               enrichedItem.julesUrl = existing.julesUrl;
+              enrichedItem.julesFailureReason = existing.julesFailureReason;
             }
             if (existing.prStatus) enrichedItem.prStatus = existing.prStatus;
             if (existing.mergeable !== undefined) enrichedItem.mergeable = existing.mergeable;
@@ -904,6 +908,7 @@ function App() {
                 if (existingPr.julesStatus) {
                   enrichedPr.julesStatus = existingPr.julesStatus;
                   enrichedPr.julesUrl = existingPr.julesUrl;
+                  enrichedPr.julesFailureReason = existingPr.julesFailureReason;
                 }
                 if (existingPr.prStatus) enrichedPr.prStatus = existingPr.prStatus;
                 if (existingPr.mergeable !== undefined) enrichedPr.mergeable = existingPr.mergeable;
@@ -958,6 +963,7 @@ function App() {
                     target.julesStatus = result.status;
                     target.julesUrl = result.url;
                     target.julesTitle = result.title;
+                    target.julesFailureReason = result.reason;
                   }
                 }
                 target.enrichingJules = false;
@@ -1056,23 +1062,27 @@ function App() {
                         const checkRunsData: any = await checkRunsResponse.json();
                         let color: 'black' | 'green' | 'red' | 'yellow' = 'black';
                         let label = 'Create';
+                        let prReason: string | undefined;
 
                         if (checkRunsData?.total_count > 0 && Array.isArray(checkRunsData.check_runs)) {
                           const checkRuns = checkRunsData.check_runs;
-                          const someFailed = checkRuns.some((run: any) =>
+                          const failingRuns = checkRuns.filter((run: any) =>
                             ['failure', 'cancelled', 'timed_out', 'action_required'].includes(run.conclusion)
                           );
+                          const someFailed = failingRuns.length > 0;
                           const someRunning = checkRuns.some((run: any) => run.status !== 'completed');
                           const completedCount = checkRuns.filter((run: any) => run.status === 'completed').length;
 
-                          if (someFailed) color = 'red';
-                          else if (someRunning) color = 'yellow';
+                          if (someFailed) {
+                            color = 'red';
+                            prReason = failingRuns.map((r: any) => r.name).join(', ');
+                          } else if (someRunning) color = 'yellow';
                           else color = 'green';
 
                           label = `${completedCount}/${checkRuns.length}`;
                         }
 
-                        target.prStatus = { color, label };
+                        target.prStatus = { color, label, reason: prReason };
                       }
                     }
                   }
@@ -1276,6 +1286,19 @@ function App() {
                               <div className="tooltip-section-header">Summary:</div>
                               {issue.julesTitle || (issue.body ? (issue.body.length > 300 ? issue.body.substring(0, 300) + '...' : issue.body) : 'No summary available.')}
                             </div>
+                            {(issue.julesFailureReason || issue.prStatus?.reason || (issue.linkedPRs && issue.linkedPRs.some(pr => pr.julesFailureReason || pr.prStatus?.reason))) && (
+                              <div className="tooltip-summary-section">
+                                <div className="tooltip-section-header">Failure Reason:</div>
+                                {issue.julesFailureReason && <div>Jules: {issue.julesFailureReason}</div>}
+                                {issue.prStatus?.reason && <div>CI: {issue.prStatus.reason}</div>}
+                                {issue.linkedPRs?.map(pr => (
+                                  <div key={pr.id}>
+                                    {pr.julesFailureReason && <div>PR #{pr.number} Jules: {pr.julesFailureReason}</div>}
+                                    {pr.prStatus?.reason && <div>PR #{pr.number} CI: {pr.prStatus.reason}</div>}
+                                  </div>
+                                ))}
+                              </div>
+                            )}
                             {issue.linkedPRs && issue.linkedPRs.length > 0 && (
                               <div className="tooltip-summary-section">
                                 <div className="tooltip-section-header">Linked PRs:</div>
@@ -1378,8 +1401,11 @@ function App() {
                         )}
                         {issue.prStatus && (
                           <div className="pr-status-container">
-                            <span className={`pr-label pr-label-${issue.prStatus.color}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
+                            <span className={`pr-label pr-label-${issue.prStatus.color}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''} ${issue.prStatus.reason ? 'tooltip' : ''}`}>
                               {issue.prStatus.label}
+                              {issue.prStatus.reason && (
+                                <span className="tooltip-text">Failed: {issue.prStatus.reason}</span>
+                              )}
                             </span>
                             {ghToken && issue.mergeable_state === 'behind' && (
                               <button
@@ -1408,8 +1434,11 @@ function App() {
                             </div>
                           ) : pr.prStatus && (
                             <div key={pr.id} className="pr-status-container subtitle">
-                              <span className={`pr-label pr-label-${pr.prStatus.color}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
+                              <span className={`pr-label pr-label-${pr.prStatus.color}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''} ${pr.prStatus.reason ? 'tooltip' : ''}`}>
                                 {pr.prStatus.label}
+                                {pr.prStatus.reason && (
+                                  <span className="tooltip-text">Failed: {pr.prStatus.reason}</span>
+                                )}
                               </span>
                               {ghToken && pr.mergeable_state === 'behind' && (
                                 <button
@@ -1443,17 +1472,22 @@ function App() {
                           <span className="loading-dots">...</span>
                         )}
                         {issue.julesStatus ? (
-                          issue.julesUrl ? (
-                            <a href={issue.julesUrl} target="_blank" rel="noopener noreferrer">
+                          <span className={issue.julesFailureReason ? 'tooltip' : ''}>
+                            {issue.julesUrl ? (
+                              <a href={issue.julesUrl} target="_blank" rel="noopener noreferrer">
+                                <span className={`badge jules-status-${issue.julesStatus}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
+                                  {formatJulesStatus(issue.julesStatus)}
+                                </span>
+                              </a>
+                            ) : (
                               <span className={`badge jules-status-${issue.julesStatus}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
                                 {formatJulesStatus(issue.julesStatus)}
                               </span>
-                            </a>
-                          ) : (
-                            <span className={`badge jules-status-${issue.julesStatus}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
-                              {formatJulesStatus(issue.julesStatus)}
-                            </span>
-                          )
+                            )}
+                            {issue.julesFailureReason && (
+                              <span className="tooltip-text">{issue.julesFailureReason}</span>
+                            )}
+                          </span>
                         ) : (
                           issue.isJules && !julesToken ? (
                             <span className="text-muted">Token Required</span>
@@ -1469,7 +1503,7 @@ function App() {
                               <span className="loading-dots">...</span>
                             </div>
                           ) : pr.julesStatus && (
-                            <div key={pr.id} className="subtitle">
+                            <div key={pr.id} className={`subtitle ${pr.julesFailureReason ? 'tooltip' : ''}`}>
                               {pr.julesUrl ? (
                                 <a href={pr.julesUrl} target="_blank" rel="noopener noreferrer">
                                   <span className={`badge jules-status-${pr.julesStatus}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
@@ -1480,6 +1514,9 @@ function App() {
                                 <span className={`badge jules-status-${pr.julesStatus}${hasAutoRepeatLabel(issue) ? ' auto-repeat-tag' : ''}`}>
                                   {formatJulesStatus(pr.julesStatus)}
                                 </span>
+                              )}
+                              {pr.julesFailureReason && (
+                                <span className="tooltip-text">{pr.julesFailureReason}</span>
                               )}
                             </div>
                           )
