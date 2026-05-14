@@ -426,11 +426,11 @@ function App() {
           ];
 
           lines.forEach(line => {
-            const match = line.match(/^(\s*)-\s*\[([ xX])\]\s*(.*)$/);
+            const match = line.match(/^(\s*)-\s*(?:\[([ xX])\]|(✅|🚧|⏳))\s*(.*)$/);
             if (match) {
               const indent = match[1].length;
-              const completed = match[2].toLowerCase() === 'x';
-              const title = match[3].trim();
+              const completed = match[2]?.toLowerCase() === 'x' || match[3] === '✅';
+              const title = (match[4] || '').trim();
               const newTask: RoadmapTask = { completed, title, children: [] };
 
               while (stack.length > 1 && indent <= stack[stack.length - 1].indent) {
